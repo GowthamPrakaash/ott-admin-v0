@@ -3,21 +3,18 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { format } from "date-fns"
 import { Edit } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DeleteButton } from "@/components/shared/delete-button"
 
 interface GenrePageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 export async function generateMetadata({ params }: GenrePageProps): Promise<Metadata> {
-  const supabase = createClient()
-
-  const { data: genre } = await supabase.from("genres").select("name").eq("id", params.id).single()
+  const awaitedParams = await params;
+  const genre = await prisma.genre.findUnique({ where: { id: awaitedParams.id } })
 
   if (!genre) {
     return {
@@ -32,18 +29,16 @@ export async function generateMetadata({ params }: GenrePageProps): Promise<Meta
 }
 
 export default async function GenrePage({ params }: GenrePageProps) {
-  const supabase = createClient()
+  const awaitedParams = await params;
 
-  const { data: genre, error } = await supabase.from("genres").select("*").eq("id", params.id).single()
-
-  if (error || !genre) {
-    notFound()
-  }
+  // Fetch genre using Prisma
+  const genre = await prisma.genre.findUnique({ where: { id: awaitedParams.id } })
+  if (!genre) return notFound()
 
   // Count movies and series with this genre
-  const [{ count: moviesCount }, { count: seriesCount }] = await Promise.all([
-    supabase.from("movies").select("*", { count: "exact", head: true }).eq("genre", genre.name),
-    supabase.from("series").select("*", { count: "exact", head: true }).eq("genre", genre.name),
+  const [moviesCount, seriesCount] = await Promise.all([
+    prisma.movie.count({ where: { genres: { some: { name: genre.name } } } }),
+    prisma.series.count({ where: { genres: { some: { name: genre.name } } } }),
   ])
 
   return (
@@ -55,12 +50,12 @@ export default async function GenrePage({ params }: GenrePageProps) {
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <Button asChild variant="outline">
-            <Link href={`/dashboard/genres/${params.id}/edit`}>
+            <Link href={`/dashboard/genres/${awaitedParams.id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
               Edit Genre
             </Link>
           </Button>
-          <DeleteButton id={params.id} name={genre.name} type="genre" redirectTo="/dashboard/genres" />
+          <DeleteButton id={awaitedParams.id} name={genre.name} type="genre" redirectTo="/dashboard/genres" />
         </div>
       </div>
 
@@ -72,7 +67,7 @@ export default async function GenrePage({ params }: GenrePageProps) {
           <CardContent>
             <p className="text-sm">{genre.description || "No description available."}</p>
             <div className="text-xs text-muted-foreground mt-4">
-              Added {format(new Date(genre.created_at), "MMM d, yyyy")}
+              Added {format(new Date(genre.createdAt), "MMM d, yyyy")}
             </div>
           </CardContent>
         </Card>

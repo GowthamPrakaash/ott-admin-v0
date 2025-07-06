@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
+import { signIn } from "next-auth/react"
 
 const formSchema = z
   .object({
+    username: z.string().min(3, { message: "Please enter a valid username" }),
     email: z.string().email({ message: "Please enter a valid email address" }),
     password: z.string().min(6, { message: "Password must be at least 6 characters" }),
     confirmPassword: z.string().min(6, { message: "Password must be at least 6 characters" }),
@@ -29,12 +30,11 @@ interface SignUpFormProps {
 export function SignUpForm({ token }: SignUpFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const { toast } = useToast()
-  const supabase = createClient()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      username: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -43,58 +43,26 @@ export function SignUpForm({ token }: SignUpFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
-
     try {
-      // Sign up the user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: values.email,
-        password: values.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
+      // Create user via API route
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: values.username,
+          email: values.email,
+          password: values.password,
+        }),
       })
-
-      if (authError) throw authError
-
-      // If we have a token, mark it as used
-      if (token && authData.user) {
-        const { error: tokenError } = await supabase
-          .from("invite_tokens")
-          .update({
-            used_by: authData.user.id,
-            used_at: new Date().toISOString(),
-          })
-          .eq("token", token)
-
-        if (tokenError) {
-          console.error("Error updating invite token:", tokenError)
-        }
-
-        // Get the role from the token
-        const { data: tokenData } = await supabase.from("invite_tokens").select("role").eq("token", token).single()
-
-        // Set the user's role
-        if (tokenData) {
-          await supabase.from("user_roles").insert({
-            user_id: authData.user.id,
-            role: tokenData.role,
-          })
-        }
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Sign up failed")
       }
-
-      toast({
-        title: "Account created",
-        description: "Please check your email to confirm your account.",
-      })
-
-      // Use window.location for a full page refresh
-      window.location.href = "/login"
+      // Redirect to login page after successful sign up
+      toast.success("Account created. Please check your email for a verification link.")
+      window.location.href = "/login?verifyEmail=1&email=" + encodeURIComponent(values.email)
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Sign up failed",
-        description: error.message || "Something went wrong. Please try again.",
-      })
+      toast.error(error.message || "Something went wrong. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -103,6 +71,19 @@ export function SignUpForm({ token }: SignUpFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="username"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Username</FormLabel>
+              <FormControl>
+                <Input placeholder="yourusername" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="email"

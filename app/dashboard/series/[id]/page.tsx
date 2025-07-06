@@ -4,22 +4,22 @@ import Image from "next/image"
 import { notFound } from "next/navigation"
 import { format } from "date-fns"
 import { CalendarDays, Clock, Edit, Plus, Video } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { DeleteButton } from "@/components/shared/delete-button"
 import { StatusBadge } from "@/components/shared/status-badge"
 
 interface SeriesPageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 export async function generateMetadata({ params }: SeriesPageProps): Promise<Metadata> {
-  const supabase = createClient()
-
-  const { data: series } = await supabase.from("series").select("title").eq("id", params.id).single()
+  const awaitedParams = await params
+  const series = await prisma.series.findUnique({
+    where: { id: awaitedParams.id },
+    select: { title: true },
+  })
 
   if (!series) {
     return {
@@ -34,20 +34,25 @@ export async function generateMetadata({ params }: SeriesPageProps): Promise<Met
 }
 
 export default async function SeriesPage({ params }: SeriesPageProps) {
-  const supabase = createClient()
+  const awaitedParams = await params
 
-  const { data: series, error: seriesError } = await supabase.from("series").select("*").eq("id", params.id).single()
+  // Fetch series using Prisma
+  const series = await prisma.series.findUnique({
+    where: { id: awaitedParams.id },
+    include: {
+      genres: true,
+      episodes: {
+        orderBy: [
+          { season_number: "asc" },
+          { episode_number: "asc" },
+        ],
+      },
+    },
+  })
 
-  if (seriesError || !series) {
-    notFound()
+  if (!series) {
+    return notFound()
   }
-
-  const { data: episodes, error: episodesError } = await supabase
-    .from("episodes")
-    .select("*")
-    .eq("series_id", params.id)
-    .order("season_number", { ascending: true })
-    .order("episode_number", { ascending: true })
 
   return (
     <div className="space-y-6">
@@ -61,7 +66,7 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <Button asChild variant="outline">
-            <Link href={`/dashboard/series/${params.id}/edit`}>
+            <Link href={`/dashboard/series/${awaitedParams.id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
               Edit Series
             </Link>
@@ -72,7 +77,7 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
               Add Episode
             </Link>
           </Button>
-          <DeleteButton id={params.id} name={series.title} type="series" redirectTo="/dashboard/series" />
+          <DeleteButton id={awaitedParams.id} name={series.title} type="series" redirectTo="/dashboard/series" />
         </div>
       </div>
 
@@ -91,11 +96,19 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
               <div className="flex items-center gap-2 mt-1 text-sm">
                 <span>{series.release_year}</span>
                 <span>•</span>
-                <span>{series.genre}</span>
+                {series.genres && series.genres.length > 0 && (
+                  <span className="flex gap-1 flex-wrap">
+                    {series.genres.map((g: any) => (
+                      <span key={g.id} className="bg-gray-200 text-gray-700 rounded px-2 py-0.5 text-xs mr-1 mb-1">
+                        {g.name}
+                      </span>
+                    ))}
+                  </span>
+                )}
               </div>
               <p className="mt-4 text-sm">{series.description}</p>
               <div className="text-xs text-muted-foreground mt-4">
-                Added {format(new Date(series.created_at), "MMM d, yyyy")}
+                Added {format(new Date(series.createdAt), "MMM d, yyyy")}
               </div>
             </CardContent>
           </Card>
@@ -124,13 +137,7 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
         <div className="md:col-span-2">
           <h2 className="text-xl font-semibold mb-4">Episodes</h2>
 
-          {episodesError && (
-            <div className="bg-destructive/15 text-destructive p-4 rounded-md">
-              <p>Error loading episodes: {episodesError.message}</p>
-            </div>
-          )}
-
-          {episodes && episodes.length === 0 && (
+          {series.episodes.length === 0 && (
             <div className="text-center py-12 border rounded-lg">
               <Video className="mx-auto h-12 w-12 text-muted-foreground" />
               <h3 className="mt-4 text-lg font-semibold">No episodes found</h3>
@@ -144,16 +151,16 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
             </div>
           )}
 
-          {episodes && episodes.length > 0 && (
+          {series.episodes.length > 0 && (
             <div className="space-y-4">
               {/* Group episodes by season */}
-              {Array.from(new Set(episodes.map((ep) => ep.season_number)))
+              {Array.from(new Set(series.episodes.map((ep) => ep.season_number)))
                 .sort()
                 .map((season) => (
                   <div key={season} className="space-y-3">
                     <h3 className="font-medium">Season {season}</h3>
                     <div className="grid gap-3">
-                      {episodes
+                      {series.episodes
                         .filter((ep) => ep.season_number === season)
                         .sort((a, b) => a.episode_number - b.episode_number)
                         .map((episode) => (

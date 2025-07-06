@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { EpisodeForm } from "@/components/episodes/episode-form"
 
 interface EditEpisodePageProps {
@@ -10,9 +10,10 @@ interface EditEpisodePageProps {
 }
 
 export async function generateMetadata({ params }: EditEpisodePageProps): Promise<Metadata> {
-  const supabase = createClient()
-
-  const { data: episode } = await supabase.from("episodes").select("title").eq("id", params.id).single()
+  const episode = await prisma.episode.findUnique({
+    where: { id: params.id },
+    select: { title: true },
+  })
 
   if (!episode) {
     return {
@@ -27,13 +28,8 @@ export async function generateMetadata({ params }: EditEpisodePageProps): Promis
 }
 
 export default async function EditEpisodePage({ params }: EditEpisodePageProps) {
-  const supabase = createClient()
-
-  const { data: episode, error } = await supabase.from("episodes").select("*").eq("id", params.id).single()
-
-  if (error || !episode) {
-    notFound()
-  }
+  const episode = await prisma.episode.findUnique({ where: { id: params.id } })
+  if (!episode) notFound()
 
   return (
     <div className="space-y-6">

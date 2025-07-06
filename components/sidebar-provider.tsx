@@ -6,9 +6,10 @@ import { Sidebar } from "@/components/sidebar"
 
 interface SidebarProviderProps {
   children: React.ReactNode
+  isAdmin?: boolean // Optional prop to pass user role
 }
 
-export function SidebarProvider({ children }: SidebarProviderProps) {
+export function SidebarProvider({ children, isAdmin }: SidebarProviderProps) {
   const pathname = usePathname()
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true)
 
@@ -41,7 +42,7 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
+      <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} isAdmin={isAdmin} />
       <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? "ml-64" : "ml-16"}`}>{children}</div>
     </div>
   )

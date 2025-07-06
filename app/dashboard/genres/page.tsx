@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { format } from "date-fns"
 import { Layers, Plus } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -12,9 +12,8 @@ export const metadata: Metadata = {
 }
 
 export default async function GenresPage() {
-  const supabase = createClient()
-
-  const { data: genres, error } = await supabase.from("genres").select("*").order("name")
+  // Fetch genres using Prisma
+  const genres = await prisma.genre.findMany({ orderBy: { name: "asc" } })
 
   return (
     <div className="space-y-6">
@@ -30,12 +29,6 @@ export default async function GenresPage() {
           </Link>
         </Button>
       </div>
-
-      {error && (
-        <div className="bg-destructive/15 text-destructive p-4 rounded-md">
-          <p>Error loading genres: {error.message}</p>
-        </div>
-      )}
 
       {genres && genres.length === 0 && (
         <div className="text-center py-12">
@@ -63,14 +56,9 @@ export default async function GenresPage() {
                   <p className="text-sm text-muted-foreground line-clamp-3">
                     {genre.description || "No description available."}
                   </p>
-                  <div className="flex justify-between items-center mt-4">
-                    <div className="text-xs text-muted-foreground">
-                      Added {format(new Date(genre.created_at), "MMM d, yyyy")}
-                    </div>
-                    <Button variant="outline" size="sm">
-                      View Details
-                    </Button>
-                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Added {format(new Date(genre.createdAt), "MMM d, yyyy")}
+                  </p>
                 </CardContent>
               </Card>
             </Link>

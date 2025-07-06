@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { Film, Plus, Tv, Video } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -11,15 +11,11 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
-  const supabase = createClient()
-
-  // Fetch counts from database
-  const [{ count: moviesCount }, { count: seriesCount }, { count: episodesCount }] = await Promise.all([
-    supabase.from("movies").select("*", { count: "exact", head: true }),
-    supabase.from("series").select("*", { count: "exact", head: true }),
-    supabase.from("episodes").select("*", { count: "exact", head: true }),
+  const [moviesCount, seriesCount, episodesCount] = await Promise.all([
+    prisma.movie.count(),
+    prisma.series.count(),
+    prisma.episode.count(),
   ])
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between gap-4">

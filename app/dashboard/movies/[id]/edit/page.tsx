@@ -1,18 +1,15 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { MovieForm } from "@/components/movies/movie-form"
 
 interface EditMoviePageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 export async function generateMetadata({ params }: EditMoviePageProps): Promise<Metadata> {
-  const supabase = createClient()
-
-  const { data: movie } = await supabase.from("movies").select("title").eq("id", params.id).single()
+  const awaitedParams = await params;
+  const movie = await prisma.movie.findUnique({ where: { id: awaitedParams.id } })
 
   if (!movie) {
     return {
@@ -27,13 +24,13 @@ export async function generateMetadata({ params }: EditMoviePageProps): Promise<
 }
 
 export default async function EditMoviePage({ params }: EditMoviePageProps) {
-  const supabase = createClient()
-
-  const { data: movie, error } = await supabase.from("movies").select("*").eq("id", params.id).single()
-
-  if (error || !movie) {
-    notFound()
-  }
+  // Fetch movie using Prisma
+  const awaitedParams = await params;
+  const movie = await prisma.movie.findUnique({
+    where: { id: awaitedParams.id },
+    include: { genres: true }
+  })
+  if (!movie) return notFound()
 
   return (
     <div className="space-y-6">

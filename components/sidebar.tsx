@@ -6,7 +6,6 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Film, Home, Layers, Link2, LogOut, Menu, PlusCircle, Settings, Tv, User, Video, Moon } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,49 +19,33 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useSession } from "next-auth/react"
 
 interface SidebarProps {
   isOpen: boolean
   toggleSidebar: () => void
+  isAdmin?: boolean // Optional prop to pass user role
 }
 
-export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
+export function Sidebar({ isOpen, toggleSidebar, isAdmin }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
+  const { data: sessionData } = useSession()
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    async function getUserData() {
-      setIsLoading(true)
-      const { data } = await supabase.auth.getUser()
+    setIsLoading(true)
 
-      if (data?.user) {
-        setUserEmail(data.user.email)
-
-        // Check if user has admin role
-        // This is a simplified example - you would need to implement your own role system
-        // For example, you might have a 'user_roles' table in your database
-        const { data: userData, error } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", data.user.id)
-          .single()
-
-        if (!error && userData && userData.role === "admin") {
-          setIsAdmin(true)
-        }
-      }
-      setIsLoading(false)
+    if (sessionData?.user) {
+      setUserEmail(sessionData.user.email)
     }
 
-    getUserData()
-  }, [supabase])
+    setIsLoading(false)
+  }, [sessionData])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    // Sign out logic here (e.g., call to NextAuth signOut function)
     router.push("/login")
     router.refresh()
   }
@@ -88,9 +71,8 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-30 h-full bg-background border-r transition-transform duration-300 ease-in-out ${
-          isOpen ? "w-64" : "w-16"
-        }`}
+        className={`fixed top-0 left-0 z-30 h-full bg-background border-r transition-transform duration-300 ease-in-out ${isOpen ? "w-64" : "w-16"
+          }`}
       >
         <div className="flex h-16 items-center justify-between px-4 border-b">
           <div className="flex items-center gap-2">
@@ -196,23 +178,27 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 <h3 className={`mb-2 px-2 text-xs font-semibold text-muted-foreground ${!isOpen && "sr-only"}`}>
                   System
                 </h3>
-                <NavItem
-                  href="/dashboard/settings"
-                  icon={<Settings className="h-5 w-5" />}
-                  title="Settings"
-                  isActive={isActive("/dashboard/settings")}
-                  isOpen={isOpen}
-                />
-                <NavItem
+                {isAdmin && (
+                  <NavItem
+                    href="/dashboard/roles"
+                    icon={<User className="h-5 w-5" />}
+                    title="Roles"
+                    isActive={isActive("/dashboard/roles")}
+                    isOpen={isOpen}
+                  />
+                )}
+                <a
                   href="/stream"
-                  icon={<Film className="h-5 w-5" />}
-                  title="Take me to OTT"
-                  isActive={false}
-                  isOpen={isOpen}
-                />
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors text-muted-foreground hover:bg-muted hover:text-foreground ${!isOpen && "justify-center px-2"}`}
+                >
+                  <Film className="h-5 w-5" />
+                  {isOpen && <span>Take me to OTT</span>}
+                </a>
 
                 {/* Add Theme Toggle */}
-                <div
+                {/* <div
                   className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors text-muted-foreground hover:bg-muted hover:text-foreground ${!isOpen && "justify-center px-2"}`}
                 >
                   {isOpen ? (
@@ -224,18 +210,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                   ) : (
                     <ThemeToggle />
                   )}
-                </div>
-
-                {/* Only show invite link option for admin users */}
-                {isAdmin && (
-                  <NavItem
-                    href="/dashboard/invites"
-                    icon={<Link2 className="h-5 w-5" />}
-                    title="Invite Users"
-                    isActive={isActive("/dashboard/invites")}
-                    isOpen={isOpen}
-                  />
-                )}
+                </div> */}
               </div>
             </nav>
           </div>
@@ -292,9 +267,8 @@ function NavItem({ href, icon, title, isActive, isOpen }: NavItemProps) {
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-        isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-      } ${!isOpen && "justify-center px-2"}`}
+      className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        } ${!isOpen && "justify-center px-2"}`}
     >
       {icon}
       {isOpen && <span>{title}</span>}

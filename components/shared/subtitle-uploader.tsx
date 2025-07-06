@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -52,7 +52,6 @@ export function SubtitleUploader({ videoId, value = [], onChange, contentType }:
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { toast } = useToast()
   const initialRenderRef = useRef(true)
 
   // Initialize subtitles from value prop only once on mount
@@ -101,11 +100,7 @@ export function SubtitleUploader({ videoId, value = [], onChange, contentType }:
       const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase()
 
       if (!validExtensions.includes(fileExtension)) {
-        toast({
-          variant: "destructive",
-          title: "Invalid file format",
-          description: "Please upload a valid subtitle file (SRT, VTT, SUB, SBV, TTML, DFXP)",
-        })
+        toast.error("Please upload a valid subtitle file (SRT, VTT, SUB, SBV, TTML, DFXP)")
         return
       }
 
@@ -116,28 +111,15 @@ export function SubtitleUploader({ videoId, value = [], onChange, contentType }:
   // Update the handleAddSubtitle function to not store src
   const handleAddSubtitle = async () => {
     if (!newLanguage || !newLabel || !selectedFile || !videoId) {
-      toast({
-        variant: "destructive",
-        title: "Missing information",
-        description: "Please fill in all fields and select a subtitle file",
-      })
+      toast.error("Please fill in all fields and select a subtitle file")
       return
     }
-
-    // Check if language already exists
     if (subtitles.some((sub) => sub.language === newLanguage)) {
-      toast({
-        variant: "destructive",
-        title: "Language already exists",
-        description: "A subtitle for this language already exists. Please choose a different language.",
-      })
+      toast.error("A subtitle for this language already exists. Please choose a different language.")
       return
     }
-
     setIsUploading(true)
-
     try {
-      // Create a new subtitle entry
       const newSubtitle: SubtitleItem = {
         language: newLanguage,
         label: newLabel,
@@ -145,49 +127,33 @@ export function SubtitleUploader({ videoId, value = [], onChange, contentType }:
         isUploading: true,
         isNew: true,
       }
-
-      // Add to the list
       const updatedSubtitles = [...subtitles, newSubtitle]
       setSubtitles(updatedSubtitles)
-
-      // Upload the subtitle file to Bunny Stream
+      // Upload the subtitle file to our local API endpoint
       const formData = new FormData()
       formData.append("file", selectedFile)
-      formData.append("videoId", videoId)
-      formData.append("language", newLanguage)
-      formData.append("label", newLabel)
-
-      const response = await fetch("/api/bunny/subtitles", {
+      const response = await fetch("/api/upload/subtitle", {
         method: "POST",
         body: formData,
       })
-
       if (!response.ok) {
         throw new Error("Failed to upload subtitle")
       }
-
       const data = await response.json()
-
-      // Update the subtitle without src property
+      // Update the subtitle with the src property
       const finalSubtitles = updatedSubtitles.map((sub) => {
         if (sub.language === newLanguage) {
           return {
             language: sub.language,
             label: sub.label,
+            src: data.url,
           }
         }
         return sub
       })
-
       setSubtitles(finalSubtitles)
       onChange(finalSubtitles)
-
-      toast({
-        title: "Subtitle added",
-        description: `${newLabel} subtitle has been added successfully.`,
-      })
-
-      // Reset form
+      toast.success(`${newLabel} subtitle has been added successfully.`)
       setNewLanguage("")
       setNewLabel("")
       setSelectedFile(null)
@@ -197,53 +163,22 @@ export function SubtitleUploader({ videoId, value = [], onChange, contentType }:
       }
     } catch (error: any) {
       console.error("Error uploading subtitle:", error)
-
-      // Remove the failed subtitle
       const filteredSubtitles = subtitles.filter((sub) => sub.language !== newLanguage)
       setSubtitles(filteredSubtitles)
       onChange(filteredSubtitles)
-
-      toast({
-        variant: "destructive",
-        title: "Upload failed",
-        description: error.message || "Failed to upload subtitle. Please try again.",
-      })
+      toast.error(error.message || "Failed to upload subtitle. Please try again.")
     } finally {
       setIsUploading(false)
     }
   }
 
   const handleRemoveSubtitle = async (language: string) => {
-    try {
-      // Delete from Bunny Stream if we have a videoId
-      if (videoId) {
-        const response = await fetch(`/api/bunny/subtitles?videoId=${videoId}&language=${language}`, {
-          method: "DELETE",
-        })
+    // Remove from the list
+    const updatedSubtitles = subtitles.filter((sub) => sub.language !== language)
+    setSubtitles(updatedSubtitles)
+    onChange(updatedSubtitles)
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to delete subtitle")
-        }
-      }
-
-      // Remove from the list
-      const updatedSubtitles = subtitles.filter((sub) => sub.language !== language)
-      setSubtitles(updatedSubtitles)
-      onChange(updatedSubtitles)
-
-      toast({
-        title: "Subtitle removed",
-        description: "The subtitle has been removed successfully.",
-      })
-    } catch (error: any) {
-      console.error("Error removing subtitle:", error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to remove subtitle. Please try again.",
-      })
-    }
+    toast.success("The subtitle has been removed successfully.")
   }
 
   const getLanguageLabel = (code: string) => {

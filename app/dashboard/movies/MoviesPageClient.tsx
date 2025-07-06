@@ -4,7 +4,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { format } from "date-fns"
 import { Clock, Film, Plus } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { StatusBadge } from "@/components/shared/status-badge"
@@ -16,31 +16,17 @@ export default function MoviesPageClient({
 }: {
   searchParams?: { status?: string }
 }) {
-  const [movies, setMovies] = useState<any[] | null>(null)
   const [error, setError] = useState<Error | null>(null)
-  const supabase = createClient()
-
   const status = searchParams?.status
-
+  const query = status && (status === "published" || status === "draft") ? `?status=${status}` : ""
+  const { data: movies, error: fetchError } = useSWR(`/api/movies${query}`, async (url) => {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error("Failed to fetch movies")
+    return res.json()
+  })
   useEffect(() => {
-    async function fetchMovies() {
-      let query = supabase.from("movies").select("*")
-
-      if (status && (status === "published" || status === "draft")) {
-        query = query.eq("status", status)
-      }
-
-      const { data, error } = await query.order("created_at", { ascending: false })
-
-      if (error) {
-        setError(error)
-      } else {
-        setMovies(data)
-      }
-    }
-
-    fetchMovies()
-  }, [status, supabase])
+    if (fetchError) setError(fetchError)
+  }, [fetchError])
 
   return (
     <div className="space-y-6">
@@ -121,10 +107,18 @@ export default function MoviesPageClient({
                     <h3 className="font-semibold line-clamp-1">{movie.title}</h3>
                     <StatusBadge status={movie.status} />
                   </div>
-                  <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground flex-wrap">
                     <span>{movie.release_year}</span>
                     <span>•</span>
-                    <span>{movie.genre}</span>
+                    {movie.genres && movie.genres.length > 0 && (
+                      <span className="flex gap-1 flex-wrap">
+                        {movie.genres.map((g: any) => (
+                          <span key={g.id} className="bg-gray-200 text-gray-700 rounded px-2 py-0.5 text-xs mr-1 mb-1">
+                            {g.name}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center mt-2 text-sm text-muted-foreground">
                     <Clock className="mr-1 h-3 w-3" />
@@ -134,7 +128,7 @@ export default function MoviesPageClient({
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{movie.description}</p>
                   <div className="text-xs text-muted-foreground mt-3">
-                    Added {format(new Date(movie.created_at), "MMM d, yyyy")}
+                    Added {format(new Date(movie.createdAt), "MMM d, yyyy")}
                   </div>
                 </CardContent>
               </Card>

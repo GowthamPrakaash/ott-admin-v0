@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { ContentGrid } from "@/components/stream/content-grid"
 
-export async function generateMetadata({ params }: { params: { name: string } }) {
-  const decodedName = decodeURIComponent(params.name)
+export async function generateMetadata({ params }: { params: Promise<{ name: string }> }) {
+  const awaitedParams = await params
+  const decodedName = decodeURIComponent(awaitedParams.name)
 
   return {
     title: `${decodedName} | Apsara Streaming`,
@@ -11,37 +12,32 @@ export async function generateMetadata({ params }: { params: { name: string } })
   }
 }
 
-export default async function GenrePage({ params }: { params: { name: string } }) {
-  const decodedName = decodeURIComponent(params.name)
-  const supabase = createClient()
+export default async function GenrePage({ params }: { params: Promise<{ name: string }> }) {
+  const awaitedParams = await params
+  const decodedName = decodeURIComponent(awaitedParams.name)
 
   // Fetch genre details
-  const { data: genre, error } = await supabase.from("genres").select("*").eq("name", decodedName).single()
-
-  if (error) {
-    notFound()
-  }
+  const genre = await prisma.genre.findUnique({ where: { name: decodedName } })
+  if (!genre) notFound()
 
   // Fetch movies in this genre
-  const { data: movies } = await supabase
-    .from("movies")
-    .select("*")
-    .eq("status", "published")
-    .eq("genre", decodedName)
-    .order("created_at", { ascending: false })
+  const movies = await prisma.movie.findMany({
+    where: { status: "published", genres: { some: { name: genre.name } } },
+    orderBy: { createdAt: "desc" },
+    include: { genres: true },
+  })
 
   // Fetch series in this genre
-  const { data: series } = await supabase
-    .from("series")
-    .select("*")
-    .eq("status", "published")
-    .eq("genre", decodedName)
-    .order("created_at", { ascending: false })
+  const series = await prisma.series.findMany({
+    where: { status: "published", genres: { some: { name: genre.name } } },
+    orderBy: { createdAt: "desc" },
+    include: { genres: true },
+  })
 
   // Combine movies and series
   const allContent = [
-    ...(movies || []).map((item) => ({ ...item, contentType: "movie" })),
-    ...(series || []).map((item) => ({ ...item, contentType: "series" })),
+    ...movies.map((item) => ({ ...item, contentType: "movie" })),
+    ...series.map((item) => ({ ...item, contentType: "series" })),
   ]
 
   return (

@@ -1,147 +1,128 @@
 import { notFound } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { VideoPlayer } from "@/components/stream/video-player"
 import { ContentSlider } from "@/components/stream/content-slider"
 
-export async function generateMetadata({ params }: { params: { type: string; id: string } }) {
-  const supabase = createClient()
-
-  if (params.type === "movie") {
-    const { data: movie } = await supabase.from("movies").select("title, meta_title").eq("id", params.id).single()
-
+export async function generateMetadata({ params }: { params: Promise<{ type: string; id: string }> }) {
+  const awaitedParams = await params;
+  if (awaitedParams.type === "movie") {
+    const movie = await prisma.movie.findUnique({
+      where: { id: awaitedParams.id },
+      select: { title: true, meta_title: true },
+    })
     if (!movie) {
-      return {
-        title: "Content Not Found",
-      }
+      return { title: "Content Not Found" }
     }
-
-    return {
-      title: `${movie.meta_title || movie.title} | Apsara Streaming`,
-    }
-  } else if (params.type === "episode") {
-    const { data: episode } = await supabase
-      .from("episodes")
-      .select("title, meta_title, series:series_id(title)")
-      .eq("id", params.id)
-      .single()
-
+    return { title: `${movie.meta_title || movie.title} | Apsara Streaming` }
+  } else if (awaitedParams.type === "episode") {
+    const episode = await prisma.episode.findUnique({
+      where: { id: awaitedParams.id },
+      select: { title: true, meta_title: true, series_id: true },
+    })
     if (!episode) {
-      return {
-        title: "Content Not Found",
-      }
+      return { title: "Content Not Found" }
     }
-
-    return {
-      title: `${episode.meta_title || episode.title} - ${episode.series.title} | Apsara Streaming`,
-    }
+    const series = await prisma.series.findUnique({
+      where: { id: episode.series_id },
+      select: { title: true },
+    })
+    return { title: `${episode.meta_title || episode.title} - ${series?.title || "Series"} | Apsara Streaming` }
   }
-
-  return {
-    title: "Watch | Apsara Streaming",
-  }
+  return { title: "Watch | Apsara Streaming" }
 }
 
-export default async function WatchPage({ params }: { params: { type: string; id: string } }) {
-  const supabase = createClient()
+function recordWatchHistory(type: string, id: string) {
+  let body: any = {}
+  if (type === "movie") body.movieId = id
+  else if (type === "episode") body.episodeId = id
+  else if (type === "series") body.seriesId = id
+  fetch("/api/history", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+}
 
+export default async function WatchPage({ params }: { params: Promise<{ type: string; id: string }> }) {
+  const awaitedParams = await params;
   let content: any = null
   let relatedContent: any[] = []
   let nextEpisode: any = null
 
-  if (params.type === "movie") {
-    // Fetch movie details
-    const { data: movie, error } = await supabase
-      .from("movies")
-      .select("*")
-      .eq("id", params.id)
-      .eq("status", "published")
-      .single()
-
-    if (error || !movie) {
-      notFound()
-    }
-
+  if (awaitedParams.type === "movie") {
+    const movie = await prisma.movie.findFirst({
+      where: { id: awaitedParams.id, status: "published" },
+      include: { genres: true },
+    })
+    if (!movie) notFound()
     content = movie
-
-    // Fetch related movies (same genre)
-    const { data: related } = await supabase
-      .from("movies")
-      .select("*")
-      .eq("status", "published")
-      .eq("genre", movie.genre)
-      .neq("id", params.id)
-      .limit(10)
-
-    relatedContent = related || []
-  } else if (params.type === "episode") {
-    // Fetch episode details
-    const { data: episode, error } = await supabase
-      .from("episodes")
-      .select("*, series:series_id(*)")
-      .eq("id", params.id)
-      .eq("status", "published")
-      .single()
-
-    if (error || !episode) {
-      notFound()
-    }
-
+    relatedContent = await prisma.movie.findMany({
+      where: {
+        status: "published",
+        genres: {
+          some: {
+            id: { in: movie.genres.map((g) => g.id) },
+          },
+        },
+        id: { not: awaitedParams.id },
+      },
+      take: 10,
+    })
+  } else if (awaitedParams.type === "episode") {
+    const episode = await prisma.episode.findFirst({
+      where: { id: awaitedParams.id, status: "published" },
+      include: { series: true },
+    })
+    if (!episode) notFound()
     content = episode
-
-    // Fetch next episode
-    const { data: next } = await supabase
-      .from("episodes")
-      .select("*")
-      .eq("series_id", episode.series_id)
-      .eq("status", "published")
-      .eq("season_number", episode.season_number)
-      .gt("episode_number", episode.episode_number)
-      .order("episode_number", { ascending: true })
-      .limit(1)
-      .single()
-
-    if (!next) {
-      // Try next season
-      const { data: nextSeason } = await supabase
-        .from("episodes")
-        .select("*")
-        .eq("series_id", episode.series_id)
-        .eq("status", "published")
-        .gt("season_number", episode.season_number)
-        .order("season_number", { ascending: true })
-        .order("episode_number", { ascending: true })
-        .limit(1)
-        .single()
-
-      nextEpisode = nextSeason || null
-    } else {
-      nextEpisode = next
+    // Find next episode in same season
+    nextEpisode = await prisma.episode.findFirst({
+      where: {
+        series_id: episode.series_id,
+        status: "published",
+        season_number: episode.season_number,
+        episode_number: { gt: episode.episode_number },
+      },
+      orderBy: { episode_number: "asc" },
+    })
+    // If not found, try next season
+    if (!nextEpisode) {
+      nextEpisode = await prisma.episode.findFirst({
+        where: {
+          series_id: episode.series_id,
+          status: "published",
+          season_number: { gt: episode.season_number },
+        },
+        orderBy: [
+          { season_number: "asc" },
+          { episode_number: "asc" },
+        ],
+      })
     }
-
-    // Fetch more episodes from the same series
-    const { data: moreEpisodes } = await supabase
-      .from("episodes")
-      .select("*")
-      .eq("series_id", episode.series_id)
-      .eq("status", "published")
-      .neq("id", params.id)
-      .order("season_number", { ascending: true })
-      .order("episode_number", { ascending: true })
-      .limit(10)
-
-    relatedContent = moreEpisodes || []
+    relatedContent = await prisma.episode.findMany({
+      where: {
+        series_id: episode.series_id,
+        status: "published",
+        id: { not: awaitedParams.id },
+      },
+      orderBy: [
+        { season_number: "asc" },
+        { episode_number: "asc" },
+      ],
+      take: 10,
+    })
   } else {
     notFound()
   }
 
+  recordWatchHistory(awaitedParams.type, awaitedParams.id)
+
   return (
     <div className="container px-4 py-8 space-y-8">
-      <VideoPlayer content={content} contentType={params.type} nextEpisode={nextEpisode} />
-
+      <VideoPlayer content={content} contentType={awaitedParams.type} nextEpisode={nextEpisode} />
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">{content.title}</h1>
-
-        {params.type === "episode" && content.series && (
+        {awaitedParams.type === "episode" && content.series && (
           <div className="flex items-center gap-2">
             <span className="text-lg font-medium">{content.series.title}</span>
             <span className="text-gray-400">•</span>
@@ -150,22 +131,19 @@ export default async function WatchPage({ params }: { params: { type: string; id
             </span>
           </div>
         )}
-
         <div className="flex items-center gap-4 text-sm">
           <span>{content.release_year}</span>
           <span className="bg-white/20 px-2 py-1 rounded">{content.genre}</span>
           <span>{Math.floor(content.duration / 60)}m</span>
         </div>
-
         <p className="text-gray-300 max-w-3xl">{content.description}</p>
       </div>
-
       {relatedContent.length > 0 && (
         <div className="pt-8">
           <ContentSlider
-            title={params.type === "movie" ? "More Like This" : "More Episodes"}
+            title={awaitedParams.type === "movie" ? "More Like This" : "More Episodes"}
             items={relatedContent}
-            type={params.type === "movie" ? "movie" : "episode"}
+            type={awaitedParams.type === "movie" ? "movie" : "episode"}
           />
         </div>
       )}

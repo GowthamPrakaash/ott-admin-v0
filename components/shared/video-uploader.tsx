@@ -7,7 +7,7 @@ import { FileVideo, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 
 interface VideoUploaderProps {
   value: string
@@ -20,31 +20,12 @@ export function VideoUploader({ value, onChange, contentType = "movie" }: VideoU
   const [uploadProgress, setUploadProgress] = useState(0)
   const [fileName, setFileName] = useState<string>("")
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { toast } = useToast()
   const [isBrowser, setIsBrowser] = useState(false)
 
   // Check if we're in the browser environment
   useEffect(() => {
     setIsBrowser(true)
   }, [])
-
-  // Helper function to get the access key
-  const getAccessKey = async () => {
-    try {
-      // We need to fetch the access key from the server
-      // This is a simplified approach - in production, you might want to
-      // include this in the initial API response
-      const response = await fetch("/api/bunny/access-key")
-      if (!response.ok) {
-        throw new Error("Failed to get access key")
-      }
-      const data = await response.json()
-      return data.accessKey
-    } catch (error) {
-      console.error("Error getting access key:", error)
-      return ""
-    }
-  }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -55,98 +36,38 @@ export function VideoUploader({ value, onChange, contentType = "movie" }: VideoU
     setUploadProgress(0)
 
     try {
-      // Get upload credentials from our API
-      const response = await fetch("/api/bunny/stream", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: file.name,
-          contentType,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to get upload credentials")
-      }
-
-      const { videoId, tusUploadUrl, authTimestamp, expirationTimestamp, signature } = await response.json()
-
-      // Use FormData for multipart upload which is more widely supported
       const formData = new FormData()
       formData.append("file", file)
 
-      // Set up XMLHttpRequest for upload with progress tracking
-      const xhr = new XMLHttpRequest()
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => Math.min(prev + 5, 95))
+      }, 100)
 
-      // Set up progress tracking
-      xhr.upload.addEventListener("progress", (event) => {
-        if (event.lengthComputable) {
-          const percentage = Math.round((event.loaded / event.total) * 100)
-          setUploadProgress(percentage)
-        }
+      // Upload the video to our local API endpoint
+      const response = await fetch("/api/upload/video", {
+        method: "POST",
+        body: formData,
       })
 
-      // Set up completion handler
-      xhr.addEventListener("load", () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          setUploadProgress(100)
-          onChange(videoId)
-          toast({
-            title: "Video uploaded",
-            description: "Your video has been uploaded successfully.",
-          })
-        } else {
-          console.error("Upload failed with status:", xhr.status, xhr.responseText)
-          toast({
-            variant: "destructive",
-            title: "Upload failed",
-            description: `Server responded with status ${xhr.status}`,
-          })
-        }
-        setIsUploading(false)
-      })
+      clearInterval(progressInterval)
 
-      // Set up error handler
-      xhr.addEventListener("error", () => {
-        console.error("Network error during upload")
-        toast({
-          variant: "destructive",
-          title: "Upload failed",
-          description: "Network error occurred during upload",
-        })
-        setIsUploading(false)
-      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to upload video")
+      }
 
-      // Set up abort handler
-      xhr.addEventListener("abort", () => {
-        toast({
-          variant: "destructive",
-          title: "Upload cancelled",
-          description: "The upload was cancelled",
-        })
-        setIsUploading(false)
-      })
+      const data = await response.json()
 
-      // Open connection
-      xhr.open("PUT", tusUploadUrl, true)
-
-      // Set authentication headers
-      xhr.setRequestHeader("AccessKey", await getAccessKey())
-      xhr.setRequestHeader("Content-Type", file.type)
-
-      // Send the file directly (not as FormData for PUT requests)
-      xhr.send(file)
+      setUploadProgress(100)
+      onChange(data.url)
+      toast.success("Your video has been uploaded successfully.")
     } catch (error: any) {
-      console.error("Upload error:", error)
-      toast({
-        variant: "destructive",
-        title: "Upload failed",
-        description: error.message || "Something went wrong. Please try again.",
-      })
+      toast.error(error.message || "Something went wrong. Please try again.")
+    } finally {
       setIsUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
     }
   }
 
@@ -227,21 +148,4 @@ export function VideoUploader({ value, onChange, contentType = "movie" }: VideoU
       )}
     </div>
   )
-}
-
-async function getAccessKey() {
-  const response = await fetch("/api/bunny/access-key", {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json()
-    throw new Error(errorData.error || "Failed to get access key")
-  }
-
-  const { accessKey } = await response.json()
-  return accessKey
 }

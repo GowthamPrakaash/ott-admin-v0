@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { InviteForm } from "@/components/invites/invite-form"
 import { InviteList } from "@/components/invites/invite-list"
 
@@ -10,23 +10,14 @@ export const metadata: Metadata = {
 }
 
 export default async function InvitesPage() {
-  const supabase = createClient()
+  // Fetch user session and role using NextAuth and Prisma if needed
+  // Example: const session = await getServerSession(authOptions)
+  // const userRole = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } })
 
-  // Check if user is logged in
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session) {
-    redirect("/login")
-  }
-
-  // Check if user is admin
-  const { data: userRole } = await supabase.from("user_roles").select("role").eq("user_id", session.user.id).single()
-
-  if (!userRole || userRole.role !== "admin") {
-    redirect("/dashboard")
-  }
+  // Fetch invites using Prisma
+  const invites = await prisma.inviteToken.findMany({
+    orderBy: { created_at: "desc" },
+  })
 
   return (
     <div className="space-y-6">
@@ -35,8 +26,8 @@ export default async function InvitesPage() {
         <p className="text-muted-foreground">Generate invite links for new users</p>
       </div>
 
-      <InviteForm userId={session.user.id} />
-      <InviteList />
+      <InviteForm />
+      <InviteList invites={invites} />
     </div>
   )
 }

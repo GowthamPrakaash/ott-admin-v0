@@ -6,14 +6,13 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { format } from "date-fns"
 import * as z from "zod"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import { FileUploader } from "@/components/shared/file-uploader"
 import { VideoUploader } from "@/components/shared/video-uploader"
 import { SubtitleUploader } from "@/components/shared/subtitle-uploader"
@@ -54,8 +53,6 @@ export function EpisodeForm({ episode }: { episode?: any }) {
   const [seriesList, setSeriesList] = useState<any[]>([])
   const [calendarOpen, setCalendarOpen] = useState(false)
   const router = useRouter()
-  const { toast } = useToast()
-  const supabase = createClient()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -78,72 +75,54 @@ export function EpisodeForm({ episode }: { episode?: any }) {
 
   useEffect(() => {
     async function fetchSeries() {
-      const { data, error } = await supabase.from("series").select("id, title").order("title")
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load series list. Please try again.",
-        })
-        return
+      try {
+        const res = await fetch("/api/series")
+        if (!res.ok) throw new Error("Failed to load series.")
+        const series = await res.json()
+        setSeriesList(series)
+      } catch (error) {
+        toast.error("Failed to load series list. Please try again.")
       }
-
-      setSeriesList(data || [])
     }
-
     fetchSeries()
-  }, [toast, supabase])
+  }, [])
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true)
-
     try {
-      // Format the date to ISO string for database storage
       const formattedValues = {
         ...values,
-        release_date: values.release_date.toISOString().split("T")[0],
+        release_date: values.release_date.toISOString().split('T')[0],
       }
-
       if (episode) {
-        // Update existing episode
-        const { error } = await supabase.from("episodes").update(formattedValues).eq("id", episode.id)
-
-        if (error) throw error
-
-        toast({
-          title: "Episode updated",
-          description: "Your episode has been updated successfully.",
+        const res = await fetch("/api/episodes", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: episode.id, ...formattedValues }),
         })
-
-        // Redirect to episode detail page
+        if (!res.ok) throw new Error("Failed to update episode.")
+        toast.success('Your episode has been updated successfully.')
         router.push(`/dashboard/episodes/${episode.id}`)
       } else {
-        // Create new episode
-        const { error, data } = await supabase.from("episodes").insert(formattedValues).select()
-
-        if (error) throw error
-
-        toast({
-          title: "Episode added",
-          description: "Your episode has been added successfully.",
+        const res = await fetch("/api/episodes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formattedValues),
         })
-
-        // Redirect to series detail page with the newly created episode
-        if (data && data[0]) {
-          router.push(`/dashboard/series/${values.series_id}`)
-        } else {
-          router.push("/dashboard/episodes")
+        if (!res.ok) throw new Error("Failed to add episode.")
+        toast.success('Your episode has been added successfully.')
+        if (res.ok) {
+          const created = await res.json()
+          if (created && created.series_id) {
+            router.push(`/dashboard/series/${created.series_id}`)
+          } else {
+            router.push('/dashboard/episodes')
+          }
         }
       }
-
       router.refresh()
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Something went wrong. Please try again.",
-      })
+      toast.error(error.message || 'Something went wrong. Please try again.')
     } finally {
       setIsSubmitting(false)
     }

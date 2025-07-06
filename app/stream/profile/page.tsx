@@ -1,13 +1,26 @@
+'use client';
+
 import Image from "next/image"
 import { LogOut, Settings, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { WatchHistoryList } from "@/components/stream/watch-history-list"
+import { useEffect, useState } from "react"
+import { useSession, signOut } from "next-auth/react"
 
-export const metadata = {
-  title: "Profile | Apsara Streaming",
-  description: "Manage your profile on Apsara Streaming",
-}
+// export const metadata = {
+//   title: "Profile | Apsara Streaming",
+//   description: "Manage your profile on Apsara Streaming",
+// }
 
 export default function ProfilePage() {
+  const { data: session } = useSession()
+  const [history, setHistory] = useState<any[]>([])
+  useEffect(() => {
+    fetch("/api/history")
+      .then((res) => res.json())
+      .then((data) => setHistory(data.recent || []))
+  }, [])
+  const user = session?.user
   return (
     <div className="container px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">Profile</h1>
@@ -19,8 +32,8 @@ export default function ProfilePage() {
               <div className="relative w-24 h-24 rounded-full overflow-hidden bg-gray-800">
                 <User className="absolute inset-0 m-auto h-12 w-12 text-gray-600" />
               </div>
-              <h2 className="mt-4 text-xl font-bold">Demo User</h2>
-              <p className="text-gray-400">demo@example.com</p>
+              <h2 className="mt-4 text-xl font-bold">{user?.name || user?.email || "User"}</h2>
+              <p className="text-gray-400">{user?.email}</p>
             </div>
 
             <div className="space-y-2">
@@ -28,7 +41,7 @@ export default function ProfilePage() {
                 <Settings className="mr-2 h-4 w-4" />
                 Account Settings
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button variant="outline" className="w-full justify-start" onClick={() => signOut({ callbackUrl: '/stream' })}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign Out
               </Button>
@@ -52,40 +65,7 @@ export default function ProfilePage() {
 
           <div className="bg-gray-900 rounded-lg p-6">
             <h2 className="text-xl font-bold mb-4">Watch History</h2>
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex gap-4">
-                  <div className="relative w-24 h-16 rounded overflow-hidden bg-gray-800">
-                    <Image
-                      src={`/generic-movie-poster.png?height=100&width=150&query=movie poster ${i}`}
-                      alt="Movie poster"
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">Sample Movie {i}</h3>
-                    <p className="text-sm text-gray-400">Watched 2 days ago</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-gray-900 rounded-lg p-6">
-            <h2 className="text-xl font-bold mb-4">My List</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="relative aspect-[2/3] rounded overflow-hidden bg-gray-800">
-                  <Image
-                    src={`/generic-movie-poster.png?height=200&width=150&query=movie poster ${i}`}
-                    alt="Movie poster"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              ))}
-            </div>
+            <WatchHistoryList history={history} />
           </div>
         </div>
       </div>

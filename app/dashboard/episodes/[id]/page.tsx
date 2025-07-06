@@ -4,7 +4,7 @@ import Image from "next/image"
 import { notFound } from "next/navigation"
 import { format } from "date-fns"
 import { CalendarDays, Clock, Edit, Languages } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { DeleteButton } from "@/components/shared/delete-button"
@@ -18,9 +18,10 @@ interface EpisodePageProps {
 }
 
 export async function generateMetadata({ params }: EpisodePageProps): Promise<Metadata> {
-  const supabase = createClient()
-
-  const { data: episode } = await supabase.from("episodes").select("title").eq("id", params.id).single()
+  const episode = await prisma.episode.findUnique({
+    where: { id: params.id },
+    select: { title: true },
+  })
 
   if (!episode) {
     return {
@@ -35,17 +36,12 @@ export async function generateMetadata({ params }: EpisodePageProps): Promise<Me
 }
 
 export default async function EpisodePage({ params }: EpisodePageProps) {
-  const supabase = createClient()
-
-  const { data: episode, error: episodeError } = await supabase
-    .from("episodes")
-    .select("*, series:series_id(title)")
-    .eq("id", params.id)
-    .single()
-
-  if (episodeError || !episode) {
-    notFound()
-  }
+  // Fetch episode using Prisma
+  const episode = await prisma.episode.findUnique({
+    where: { id: params.id },
+    include: { series: { select: { title: true } } },
+  })
+  if (!episode) return notFound()
 
   // Parse subtitles from JSON
   const subtitles = episode.subtitles ? (Array.isArray(episode.subtitles) ? episode.subtitles : []) : []

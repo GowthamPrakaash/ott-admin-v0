@@ -3,7 +3,7 @@ import Link from "next/link"
 import { LoginForm } from "@/components/auth/login-form"
 
 interface LoginPageProps {
-  searchParams: { error?: string }
+  searchParams: { error?: string; verifyEmail?: string; email?: string; success?: string }
 }
 
 export const metadata: Metadata = {
@@ -13,6 +13,9 @@ export const metadata: Metadata = {
 
 export default function LoginPage({ searchParams }: LoginPageProps) {
   const errorMessage = searchParams.error ? decodeURIComponent(searchParams.error) : null
+  const successMessage = searchParams.success ? decodeURIComponent(searchParams.success) : null
+  const showVerify = searchParams.verifyEmail === "1"
+  const verifyEmail = searchParams.email ? decodeURIComponent(searchParams.email) : null
 
   return (
     <div className="container relative flex h-screen flex-col items-center justify-center md:grid lg:max-w-none lg:grid-cols-2 lg:px-0">
@@ -31,25 +34,36 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
           >
             <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
           </svg>
-         Apsara OTT
+          Apsara Streaming
         </div>
         <div className="relative z-20 mt-auto">
           <blockquote className="space-y-2">
             <p className="text-lg">
-            Movies, series, and episodes all in one place.
+              Movies, series, and episodes all in one place. Enjoy streaming your favorite content anytime.
             </p>
+            <footer className="text-sm">Apsara OTT</footer>
           </blockquote>
         </div>
       </div>
       <div className="lg:p-8">
         <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
           <div className="flex flex-col space-y-2 text-center">
-            <h1 className="text-2xl font-semibold tracking-tight">Login to your account</h1>
-            <p className="text-sm text-muted-foreground">Enter your email and password</p>
+            <h1 className="text-2xl font-semibold tracking-tight">Login to Apsara Streaming</h1>
+            <p className="text-sm text-muted-foreground">Enter your email and password to continue watching.</p>
           </div>
 
           {errorMessage && (
             <div className="bg-destructive/15 text-destructive p-3 rounded-md text-sm">{errorMessage}</div>
+          )}
+
+          {successMessage && (
+            <div className="bg-green-100 text-green-800 p-3 rounded-md text-sm mb-2">{successMessage}</div>
+          )}
+
+          {showVerify && (
+            <div className="bg-yellow-100 text-yellow-800 p-3 rounded-md text-sm mb-2">
+              Please check your email{verifyEmail ? ` (${verifyEmail})` : ""} for a verification link before logging in.
+            </div>
           )}
 
           <LoginForm />

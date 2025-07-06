@@ -1,30 +1,28 @@
+'use client';
+
+export const dynamic = "force-dynamic"
+
 import type React from "react"
 import Link from "next/link"
 import { Film, Home, Search, Tv, User } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
 import { ThemeProvider } from "@/components/theme-provider"
 import "./stream.css"
 import { Suspense } from "react"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Menu } from "lucide-react"
+import { useSession } from "next-auth/react"
 
-export const metadata = {
-  title: "Apsara Streaming",
-  description: "Watch movies and series on Apsara",
-}
+// export const metadata = {
+//   title: "Apsara Streaming",
+//   description: "Watch movies and series on Apsara",
+// }
 
-export default async function StreamLayout({
+export default function StreamLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const supabase = createClient()
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session) {
-    redirect("/login")
-  }
+  const { data: session } = useSession()
 
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
@@ -36,6 +34,38 @@ export default async function StreamLayout({
               <Link href="/stream" className="text-2xl font-bold text-red-600">
                 APSARA
               </Link>
+              {/* Hamburger for mobile */}
+              <div className="md:hidden">
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <button className="p-2 rounded-md hover:bg-white/10 focus:outline-none">
+                      <Menu className="h-6 w-6" />
+                    </button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="p-0 w-64 bg-black">
+                    <nav className="flex flex-col gap-2 p-6">
+                      <Link href="/stream" className="text-lg font-medium py-2">
+                        Home
+                      </Link>
+                      <Link href="/stream/movies" className="text-lg font-medium py-2">
+                        Movies
+                      </Link>
+                      <Link href="/stream/series" className="text-lg font-medium py-2">
+                        Series
+                      </Link>
+                      <Link href="/stream/profile" className="text-lg font-medium py-2">
+                        Profile
+                      </Link>
+                      <Link href="/stream/search" className="text-lg font-medium py-2">
+                        Search
+                      </Link>
+                      <Link href="/stream/login" className="text-lg font-medium py-2">
+                        Login
+                      </Link>
+                    </nav>
+                  </SheetContent>
+                </Sheet>
+              </div>
 
               <nav className="hidden md:flex items-center space-x-6">
                 <Link href="/stream" className="text-sm font-medium hover:text-white/80 transition">
@@ -54,9 +84,17 @@ export default async function StreamLayout({
               <Link href="/stream/search" className="p-2 hover:bg-white/10 rounded-full transition">
                 <Search className="h-5 w-5" />
               </Link>
-              <Link href="/stream/profile" className="p-2 hover:bg-white/10 rounded-full transition">
-                <User className="h-5 w-5" />
-              </Link>
+              {session ? (
+                <Link href="/stream/profile" className="p-2 hover:bg-white/10 rounded-full transition flex items-center justify-center w-9 h-9 bg-white/10 rounded-full">
+                  <span className="font-bold text-lg uppercase">
+                    {session.user?.name?.[0] || session.user?.email?.[0] || <User className="h-5 w-5" />}
+                  </span>
+                </Link>
+              ) : (
+                <Link href="/stream/login" className="p-2 hover:bg-white/10 rounded-full transition">
+                  Login
+                </Link>
+              )}
             </div>
           </div>
         </header>

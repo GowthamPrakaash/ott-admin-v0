@@ -1,18 +1,15 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { SeriesForm } from "@/components/series/series-form"
 
 interface EditSeriesPageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 export async function generateMetadata({ params }: EditSeriesPageProps): Promise<Metadata> {
-  const supabase = createClient()
-
-  const { data: series } = await supabase.from("series").select("title").eq("id", params.id).single()
+  const awaitedParams = await params;
+  const series = await prisma.series.findUnique({ where: { id: awaitedParams.id } })
 
   if (!series) {
     return {
@@ -27,13 +24,14 @@ export async function generateMetadata({ params }: EditSeriesPageProps): Promise
 }
 
 export default async function EditSeriesPage({ params }: EditSeriesPageProps) {
-  const supabase = createClient()
+  const awaitedParams = await params;
 
-  const { data: series, error } = await supabase.from("series").select("*").eq("id", params.id).single()
-
-  if (error || !series) {
-    notFound()
-  }
+  // Fetch series using Prisma
+  const series = await prisma.series.findUnique({
+    where: { id: awaitedParams.id },
+    include: { genres: true }
+  })
+  if (!series) return null
 
   return (
     <div className="space-y-6">

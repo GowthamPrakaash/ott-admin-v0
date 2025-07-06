@@ -14,7 +14,10 @@ interface ContentGridProps {
 export function ContentGrid({ items, type, genres = [] }: ContentGridProps) {
   const [selectedGenre, setSelectedGenre] = useState<string>("all")
 
-  const filteredItems = selectedGenre === "all" ? items : items.filter((item) => item.genre === selectedGenre)
+  const filteredItems =
+    selectedGenre === "all"
+      ? items
+      : items.filter((item) => item.genres && item.genres.some((g: any) => g.name === selectedGenre))
 
   return (
     <div>
@@ -53,12 +56,18 @@ export function ContentGrid({ items, type, genres = [] }: ContentGridProps) {
               <Image src={item.poster_url || "/placeholder.svg"} alt={item.title} fill className="object-cover" />
             </div>
             <h3 className="mt-2 text-sm font-medium truncate">{item.title}</h3>
-            <div className="flex items-center gap-1 text-xs text-gray-400">
+            <div className="flex items-center gap-1 text-xs text-gray-400 flex-wrap">
               <span>{item.release_year}</span>
-              {item.genre && (
+              {item.genres && item.genres.length > 0 && (
                 <>
                   <span>•</span>
-                  <span className="truncate">{item.genre}</span>
+                  <span className="flex gap-1 flex-wrap">
+                    {item.genres.map((g: any) => (
+                      <span key={g.id} className="bg-gray-200 text-gray-700 rounded px-2 py-0.5 text-xs mr-1 mb-1">
+                        {g.name}
+                      </span>
+                    ))}
+                  </span>
                 </>
               )}
             </div>

@@ -4,7 +4,7 @@ import Image from "next/image"
 import { notFound } from "next/navigation"
 import { format } from "date-fns"
 import { Clock, Edit, Languages } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { DeleteButton } from "@/components/shared/delete-button"
@@ -12,15 +12,12 @@ import { StatusBadge } from "@/components/shared/status-badge"
 import { Badge } from "@/components/ui/badge"
 
 interface MoviePageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 export async function generateMetadata({ params }: MoviePageProps): Promise<Metadata> {
-  const supabase = createClient()
-
-  const { data: movie } = await supabase.from("movies").select("title").eq("id", params.id).single()
+  const awaitedParams = await params
+  const movie = await prisma.movie.findUnique({ where: { id: awaitedParams.id }, select: { title: true } })
 
   if (!movie) {
     return {
@@ -35,13 +32,14 @@ export async function generateMetadata({ params }: MoviePageProps): Promise<Meta
 }
 
 export default async function MoviePage({ params }: MoviePageProps) {
-  const supabase = createClient()
+  const awaitedParams = await params
 
-  const { data: movie, error: movieError } = await supabase.from("movies").select("*").eq("id", params.id).single()
-
-  if (movieError || !movie) {
-    notFound()
-  }
+  // Fetch movie using Prisma
+  const movie = await prisma.movie.findUnique({
+    where: { id: awaitedParams.id },
+    include: { genres: true },
+  })
+  if (!movie) return notFound()
 
   // Parse subtitles from JSON
   const subtitles = movie.subtitles ? (Array.isArray(movie.subtitles) ? movie.subtitles : []) : []
@@ -54,18 +52,35 @@ export default async function MoviePage({ params }: MoviePageProps) {
             <h1 className="text-3xl font-bold tracking-tight">{movie.title}</h1>
             <StatusBadge status={movie.status} />
           </div>
-          <p className="text-muted-foreground">
-            {movie.release_year} • {movie.genre}
-          </p>
+          {/* <div className="flex items-center gap-2 text-muted-foreground text-sm flex-wrap mt-1">
+            <span>{movie.release_year}</span>
+            <span>•</span>
+            {movie.genres && movie.genres.length > 0 && (
+              <span className="flex gap-1 flex-wrap">
+                {movie.genres.map((g: any) => (
+                  <span key={g.id} className="bg-gray-200 text-gray-700 rounded px-2 py-0.5 text-xs mr-1 mb-1">
+                    {g.name}
+                  </span>
+                ))}
+              </span>
+            )}
+            <span>•</span>
+            <div className="flex items-center text-sm">
+              <Clock className="mr-1 h-3 w-3" />
+              <span>
+                {Math.floor(movie.duration / 60)}h {movie.duration % 60}m
+              </span>
+            </div>
+          </div> */}
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <Button asChild variant="outline">
-            <Link href={`/dashboard/movies/${params.id}/edit`}>
+            <Link href={`/dashboard/movies/${awaitedParams.id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
               Edit Movie
             </Link>
           </Button>
-          <DeleteButton id={params.id} name={movie.title} type="movie" redirectTo="/dashboard/movies" />
+          <DeleteButton id={awaitedParams.id} name={movie.title} type="movie" redirectTo="/dashboard/movies" />
         </div>
       </div>
 
@@ -83,7 +98,15 @@ export default async function MoviePage({ params }: MoviePageProps) {
             <div className="flex items-center gap-2 mt-1 text-sm">
               <span>{movie.release_year}</span>
               <span>•</span>
-              <span>{movie.genre}</span>
+              {movie.genres && movie.genres.length > 0 && (
+                <span className="flex gap-1 flex-wrap">
+                  {movie.genres.map((g: any) => (
+                    <span key={g.id} className="bg-gray-200 text-gray-700 rounded px-2 py-0.5 text-xs mr-1 mb-1">
+                      {g.name}
+                    </span>
+                  ))}
+                </span>
+              )}
               <span>•</span>
               <div className="flex items-center text-sm">
                 <Clock className="mr-1 h-3 w-3" />
@@ -94,7 +117,7 @@ export default async function MoviePage({ params }: MoviePageProps) {
             </div>
             <p className="mt-4 text-sm">{movie.description}</p>
             <div className="text-xs text-muted-foreground mt-4">
-              Added {format(new Date(movie.created_at), "MMM d, yyyy")}
+              Added {format(new Date(movie.createdAt), "MMM d, yyyy")}
             </div>
           </CardContent>
         </Card>

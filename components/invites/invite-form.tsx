@@ -1,15 +1,13 @@
 "use client"
 
-import { useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import * as z from "zod"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useToast } from "@/components/ui/use-toast"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+import { toast } from "sonner"
 
 const formSchema = z.object({
   role: z.enum(["admin", "editor", "viewer"], {
@@ -27,8 +25,6 @@ interface InviteFormProps {
 export function InviteForm({ userId }: InviteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
-  const { toast } = useToast()
-  const supabase = createClient()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -50,30 +46,25 @@ export function InviteForm({ userId }: InviteFormProps) {
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + Number.parseInt(values.expiresIn))
 
-      // Save the token to the database
-      const { error } = await supabase.from("invite_tokens").insert({
-        token,
-        created_by: userId,
-        expires_at: expiresAt.toISOString(),
-        role: values.role,
-      })
+      // TODO: Save the token to the database using Prisma
+      // const { error } = await prisma.inviteToken.create({
+      //   data: {
+      //     token,
+      //     createdBy: userId,
+      //     expiresAt: expiresAt.toISOString(),
+      //     role: values.role,
+      //   },
+      // })
 
-      if (error) throw error
+      // if (error) throw error
 
       // Generate the invite link
       const link = `${window.location.origin}/signup?token=${token}`
       setInviteLink(link)
 
-      toast({
-        title: "Invite link generated",
-        description: "The invite link has been generated successfully.",
-      })
+      toast.success("The invite link has been generated successfully.")
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Something went wrong. Please try again.",
-      })
+      toast.error(error.message || "Something went wrong. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
@@ -82,10 +73,7 @@ export function InviteForm({ userId }: InviteFormProps) {
   const copyToClipboard = () => {
     if (inviteLink) {
       navigator.clipboard.writeText(inviteLink)
-      toast({
-        title: "Copied to clipboard",
-        description: "The invite link has been copied to your clipboard.",
-      })
+      toast.success("The invite link has been copied to your clipboard.")
     }
   }
 

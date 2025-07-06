@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Search } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import useSWR from "swr"
 import { Input } from "@/components/ui/input"
 import { ContentGrid } from "@/components/stream/content-grid"
 
@@ -11,57 +11,15 @@ export default function SearchPage() {
   const searchParams = useSearchParams()
   const initialQuery = searchParams.get("q") || ""
   const [query, setQuery] = useState(initialQuery)
-  const [results, setResults] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const supabase = createClient()
 
-  useEffect(() => {
-    async function performSearch() {
-      if (!query.trim()) {
-        setResults([])
-        return
-      }
-
-      setLoading(true)
-
-      try {
-        // Search movies
-        const { data: movies } = await supabase
-          .from("movies")
-          .select("*")
-          .eq("status", "published")
-          .ilike("title", `%${query}%`)
-          .order("created_at", { ascending: false })
-
-        // Search series
-        const { data: series } = await supabase
-          .from("series")
-          .select("*")
-          .eq("status", "published")
-          .ilike("title", `%${query}%`)
-          .order("created_at", { ascending: false })
-
-        // Combine results
-        const combinedResults = [
-          ...(movies || []).map((item) => ({ ...item, contentType: "movie" })),
-          ...(series || []).map((item) => ({ ...item, contentType: "series" })),
-        ]
-
-        setResults(combinedResults)
-      } catch (error) {
-        console.error("Search error:", error)
-      } finally {
-        setLoading(false)
-      }
+  const { data: results = [], isLoading: loading } = useSWR(
+    query.trim() ? `/api/search?q=${encodeURIComponent(query)}` : null,
+    async (url) => {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error("Failed to fetch search results")
+      return res.json()
     }
-
-    // Debounce search
-    const timer = setTimeout(() => {
-      performSearch()
-    }, 300)
-
-    return () => clearTimeout(timer)
-  }, [query, supabase])
+  )
 
   // Update URL with search query
   useEffect(() => {

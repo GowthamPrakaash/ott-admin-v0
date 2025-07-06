@@ -1,16 +1,7 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
 
+// TODO: Replace with your own session logic
+// For now, always redirect to /stream
 export default async function Home() {
-  const supabase = createClient()
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session) {
-    redirect("/login")
-  } else {
-    redirect("/stream")
-  }
+  redirect("/stream")
 }

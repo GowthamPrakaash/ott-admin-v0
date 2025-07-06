@@ -4,7 +4,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { format } from "date-fns"
 import { Plus, Tv } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { StatusBadge } from "@/components/shared/status-badge"
@@ -16,32 +16,17 @@ export default function SeriesClientPage({
 }: {
   searchParams?: { status?: string }
 }) {
-  const [series, setSeries] = useState<any[] | null>(null)
   const [error, setError] = useState<Error | null>(null)
   const status = searchParams?.status
-
+  const query = status && (status === "published" || status === "draft") ? `?status=${status}` : ""
+  const { data: series, error: fetchError } = useSWR(`/api/series${query}`, async (url) => {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error("Failed to fetch series")
+    return res.json()
+  })
   useEffect(() => {
-    const fetchData = async () => {
-      const supabase = createClient()
-      let query = supabase.from("series").select("*")
-
-      if (status && (status === "published" || status === "draft")) {
-        query = query.eq("status", status)
-      }
-
-      const { data, error } = await query.order("created_at", { ascending: false })
-
-      if (error) {
-        setError(error)
-        setSeries(null)
-      } else {
-        setSeries(data)
-        setError(null)
-      }
-    }
-
-    fetchData()
-  }, [status])
+    if (fetchError) setError(fetchError)
+  }, [fetchError])
 
   return (
     <div className="space-y-6">
@@ -122,14 +107,22 @@ export default function SeriesClientPage({
                     <h3 className="font-semibold line-clamp-1">{item.title}</h3>
                     <StatusBadge status={item.status} />
                   </div>
-                  <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground flex-wrap">
                     <span>{item.release_year}</span>
                     <span>•</span>
-                    <span>{item.genre}</span>
+                    {item.genres && item.genres.length > 0 && (
+                      <span className="flex gap-1 flex-wrap">
+                        {item.genres.map((g: any) => (
+                          <span key={g.id} className="bg-gray-200 text-gray-700 rounded px-2 py-0.5 text-xs mr-1 mb-1">
+                            {g.name}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{item.description}</p>
                   <div className="text-xs text-muted-foreground mt-3">
-                    Added {format(new Date(item.created_at), "MMM d, yyyy")}
+                    Added {format(new Date(item.createdAt), "MMM d, yyyy")}
                   </div>
                 </CardContent>
               </Card>

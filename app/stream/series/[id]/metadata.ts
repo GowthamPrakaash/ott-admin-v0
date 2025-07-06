@@ -1,9 +1,10 @@
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 
 export async function generateMetadata({ params }: { params: { id: string } }) {
-  const supabase = createClient()
-
-  const { data: series } = await supabase.from("series").select("title, meta_title").eq("id", params.id).single()
+  const series = await prisma.series.findUnique({
+    where: { id: params.id },
+    select: { title: true, meta_title: true },
+  })
 
   if (!series) {
     return {

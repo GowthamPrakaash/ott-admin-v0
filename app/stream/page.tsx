@@ -1,40 +1,32 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Play, Info } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
 import { ContentSlider } from "@/components/stream/content-slider"
+import { RecentWatchHistory } from "@/components/stream/recent-watch-history"
 
 export default async function StreamPage() {
-  const supabase = createClient()
-
   // Fetch featured content (latest movie)
-  const { data: featuredMovie } = await supabase
-    .from("movies")
-    .select("*")
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single()
-
+  const featuredMovie = await prisma.movie.findFirst({
+    where: { status: "published" },
+    orderBy: { createdAt: "desc" },
+    include: { genres: true },
+  })
   // Fetch latest movies
-  const { data: latestMovies } = await supabase
-    .from("movies")
-    .select("*")
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .limit(10)
-
+  const latestMovies = await prisma.movie.findMany({
+    where: { status: "published" },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    include: { genres: true },
+  })
   // Fetch latest series
-  const { data: latestSeries } = await supabase
-    .from("series")
-    .select("*")
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .limit(10)
-
-  // We've removed the genre-specific content fetching
-
+  const latestSeries = await prisma.series.findMany({
+    where: { status: "published" },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    include: { genres: true },
+  })
   return (
     <div className="space-y-12">
       {/* Hero section with featured content */}
@@ -57,22 +49,22 @@ export default async function StreamPage() {
                   <Play className="mr-2 h-5 w-5" /> Play
                 </Link>
               </Button>
-              <Button variant="outline" size="lg">
-                <Info className="mr-2 h-5 w-5" /> More Info
+              <Button variant="outline" size="lg" asChild>
+                <Link href={featuredMovie ? (featuredMovie.series_id ? `/stream/series/${featuredMovie.series_id}` : `/stream/movies/${featuredMovie.id}`) : "#"}>
+                  <Info className="mr-2 h-5 w-5" /> More Info
+                </Link>
               </Button>
             </div>
           </div>
         </div>
       )}
-
+      {/* Recent Watch History */}
+      <RecentWatchHistory />
       <div className="container px-4 space-y-12">
         {/* Latest Movies */}
-        <ContentSlider title="Latest Movies" items={latestMovies || []} type="movie" viewAllLink="/stream/movies" />
-
+        <ContentSlider title="Latest Movies" items={latestMovies} type="movie" viewAllLink="/stream/movies" />
         {/* Latest Series */}
-        <ContentSlider title="Latest Series" items={latestSeries || []} type="series" viewAllLink="/stream/series" />
-
-        {/* We've removed the genre-specific content sections as requested */}
+        <ContentSlider title="Latest Series" items={latestSeries} type="series" viewAllLink="/stream/series" />
       </div>
     </div>
   )

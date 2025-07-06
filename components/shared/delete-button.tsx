@@ -3,9 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Trash2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { prisma } from "@/lib/prisma"
 
 interface DeleteButtonProps {
   id: string
@@ -29,38 +29,27 @@ export function DeleteButton({ id, name, type, redirectTo }: DeleteButtonProps) 
   const [isDeleting, setIsDeleting] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const router = useRouter()
-  const { toast } = useToast()
-  const supabase = createClient()
 
   const handleDelete = async () => {
     setIsDeleting(true)
-
     try {
-      let table = ""
+      let table = ''
       switch (type) {
-        case "movie":
-          table = "movies"
+        case 'movie':
+          table = 'movie'
           break
-        case "series":
-          table = "series"
+        case 'series':
+          table = 'series'
           break
-        case "episode":
-          table = "episodes"
+        case 'episode':
+          table = 'episode'
           break
-        case "genre":
-          table = "genres"
+        case 'genre':
+          table = 'genre'
           break
       }
-
-      const { error } = await supabase.from(table).delete().eq("id", id)
-
-      if (error) throw error
-
-      toast({
-        title: `${type.charAt(0).toUpperCase() + type.slice(1)} deleted`,
-        description: `${name} has been deleted successfully.`,
-      })
-
+      await prisma[table].delete({ where: { id } })
+      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} deleted: ${name} has been deleted successfully.`)
       if (redirectTo) {
         router.push(redirectTo)
       } else {
@@ -68,11 +57,7 @@ export function DeleteButton({ id, name, type, redirectTo }: DeleteButtonProps) 
       }
       router.refresh()
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Something went wrong. Please try again.",
-      })
+      toast.error(error.message || 'Something went wrong. Please try again.')
     } finally {
       setIsDeleting(false)
       setIsOpen(false)

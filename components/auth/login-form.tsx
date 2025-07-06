@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
+import { signIn } from "next-auth/react"
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -20,8 +20,6 @@ const formSchema = z.object({
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const { toast } = useToast()
-  const supabase = createClient()
   const searchParams = useSearchParams()
 
   // Get redirectTo from URL params, default to "/stream" if not present
@@ -37,30 +35,25 @@ export function LoginForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
-
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const res = await signIn("credentials", {
         email: values.email,
         password: values.password,
+        redirect: false,
       })
-
-      if (error) {
-        throw error
+      if (res?.error) {
+        // Custom error for unverified email
+        if (res.error === "EMAIL_NOT_VERIFIED") {
+          toast.error("Email not verified. Please check your inbox and verify your email before logging in.")
+        } else {
+          toast.error("Login failed. Please check your credentials and try again.")
+        }
+        return
       }
-
-      toast({
-        title: "Login successful",
-        description: "Redirecting to dashboard...",
-      })
-
-      // Use window.location for a full page refresh instead of client-side navigation
+      toast.success("Login successful! Redirecting to dashboard...")
       window.location.href = redirectTo
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Login failed",
-        description: error.message || "Something went wrong. Please try again.",
-      })
+      toast.error(error.message || "Something went wrong. Please try again.")
     } finally {
       setIsLoading(false)
     }

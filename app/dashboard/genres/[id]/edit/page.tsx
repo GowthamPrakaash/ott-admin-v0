@@ -1,18 +1,15 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { GenreForm } from "@/components/genres/genre-form"
 
 interface EditGenrePageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 export async function generateMetadata({ params }: EditGenrePageProps): Promise<Metadata> {
-  const supabase = createClient()
-
-  const { data: genre } = await supabase.from("genres").select("name").eq("id", params.id).single()
+  const awaitedParams = await params
+  const genre = await prisma.genre.findUnique({ where: { id: awaitedParams.id } })
 
   if (!genre) {
     return {
@@ -27,13 +24,10 @@ export async function generateMetadata({ params }: EditGenrePageProps): Promise<
 }
 
 export default async function EditGenrePage({ params }: EditGenrePageProps) {
-  const supabase = createClient()
-
-  const { data: genre, error } = await supabase.from("genres").select("*").eq("id", params.id).single()
-
-  if (error || !genre) {
-    notFound()
-  }
+  const awaitedParams = await params
+  // Fetch genre using Prisma
+  const genre = await prisma.genre.findUnique({ where: { id: awaitedParams.id } })
+  if (!genre) return null
 
   return (
     <div className="space-y-6">

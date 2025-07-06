@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { Check, Trash2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,8 +33,6 @@ interface InviteToken {
 export function InviteList() {
   const [invites, setInvites] = useState<InviteToken[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const { toast } = useToast()
-  const supabase = createClient()
 
   useEffect(() => {
     fetchInvites()
@@ -43,17 +41,12 @@ export function InviteList() {
   async function fetchInvites() {
     setIsLoading(true)
     try {
-      const { data, error } = await supabase.from("invite_tokens").select("*").order("created_at", { ascending: false })
-
-      if (error) throw error
-
+      const data = await prisma.invite_tokens.findMany({
+        orderBy: { created_at: "desc" },
+      })
       setInvites(data || [])
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to load invite tokens",
-      })
+      toast.error(error.message || "Failed to load invite tokens")
     } finally {
       setIsLoading(false)
     }
@@ -61,21 +54,11 @@ export function InviteList() {
 
   async function deleteInvite(id: string) {
     try {
-      const { error } = await supabase.from("invite_tokens").delete().eq("id", id)
-
-      if (error) throw error
-
+      await prisma.invite_tokens.delete({ where: { id } })
       setInvites(invites.filter((invite) => invite.id !== id))
-      toast({
-        title: "Invite deleted",
-        description: "The invite has been deleted successfully",
-      })
+      toast.success("The invite has been deleted successfully")
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to delete invite",
-      })
+      toast.error(error.message || "Failed to delete invite")
     }
   }
 

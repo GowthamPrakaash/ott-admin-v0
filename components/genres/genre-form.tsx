@@ -5,12 +5,11 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -20,8 +19,6 @@ const formSchema = z.object({
 export function GenreForm({ genre }: { genre?: any }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
-  const { toast } = useToast()
-  const supabase = createClient()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -33,43 +30,29 @@ export function GenreForm({ genre }: { genre?: any }) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true)
-
     try {
       if (genre) {
-        // Update existing genre
-        const { error } = await supabase.from("genres").update(values).eq("id", genre.id)
-
-        if (error) throw error
-
-        toast({
-          title: "Genre updated",
-          description: "Your genre has been updated successfully.",
+        const res = await fetch("/api/genres", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: genre.id, ...values }),
         })
-
-        // Redirect to genre detail page
+        if (!res.ok) throw new Error("Failed to update genre.")
+        toast.success("Your genre has been updated successfully.")
         router.push(`/dashboard/genres/${genre.id}`)
       } else {
-        // Create new genre
-        const { error, data } = await supabase.from("genres").insert(values).select()
-
-        if (error) throw error
-
-        toast({
-          title: "Genre added",
-          description: "Your genre has been added successfully.",
+        const res = await fetch("/api/genres", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
         })
-
-        // Redirect to genres list
+        if (!res.ok) throw new Error("Failed to add genre.")
+        toast.success("Your genre has been added successfully.")
         router.push("/dashboard/genres")
       }
-
       router.refresh()
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Something went wrong. Please try again.",
-      })
+      toast.error(error.message || "Something went wrong. Please try again.")
     } finally {
       setIsSubmitting(false)
     }

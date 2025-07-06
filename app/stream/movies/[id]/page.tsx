@@ -2,50 +2,41 @@ import Link from "next/link"
 import Image from "next/image"
 import { notFound } from "next/navigation"
 import { Clock, Play } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { ContentSlider } from "@/components/stream/content-slider"
+import { prisma } from "@/lib/prisma"
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
-  const supabase = createClient()
-
-  const { data: movie } = await supabase.from("movies").select("title, meta_title").eq("id", params.id).single()
-
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const awaitedParams = await params
+  const movie = await prisma.movie.findUnique({
+    where: { id: awaitedParams.id },
+    select: { title: true, meta_title: true },
+  })
   if (!movie) {
-    return {
-      title: "Movie Not Found",
-    }
+    return { title: "Movie Not Found" }
   }
-
-  return {
-    title: `${movie.meta_title || movie.title} | Apsara Streaming`,
-  }
+  return { title: `${movie.meta_title || movie.title} | Apsara Streaming` }
 }
 
-export default async function MovieDetailPage({ params }: { params: { id: string } }) {
-  const supabase = createClient()
-
-  // Fetch movie details
-  const { data: movie, error } = await supabase
-    .from("movies")
-    .select("*")
-    .eq("id", params.id)
-    .eq("status", "published")
-    .single()
-
-  if (error || !movie) {
-    notFound()
-  }
-
-  // Fetch similar movies (same genre)
-  const { data: similarMovies } = await supabase
-    .from("movies")
-    .select("*")
-    .eq("status", "published")
-    .eq("genre", movie.genre)
-    .neq("id", params.id)
-    .limit(10)
-
+export default async function MovieDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const awaitedParams = await params
+  const movie = await prisma.movie.findFirst({
+    where: { id: awaitedParams.id, status: "published" },
+    include: { genres: true },
+  })
+  if (!movie) notFound()
+  const similarMovies = await prisma.movie.findMany({
+    where: {
+      status: "published",
+      genres: {
+        some: {
+          id: { in: movie.genres.map((g) => g.id) },
+        },
+      },
+      id: { not: awaitedParams.id }
+    },
+    take: 10,
+  })
   return (
     <div>
       {/* Hero section */}
@@ -56,7 +47,15 @@ export default async function MovieDetailPage({ params }: { params: { id: string
           <h1 className="text-4xl md:text-6xl font-bold">{movie.title}</h1>
           <div className="flex items-center gap-4 text-sm">
             <span>{movie.release_year}</span>
-            <span className="bg-white/20 px-2 py-1 rounded">{movie.genre}</span>
+            {movie.genres && movie.genres.length > 0 && (
+              <span className="flex gap-1 flex-wrap">
+                {movie.genres.map((genre) => (
+                  <span key={genre.id} className="bg-white/20 px-2 py-1 rounded text-xs">
+                    {genre.name}
+                  </span>
+                ))}
+              </span>
+            )}
             <div className="flex items-center">
               <Clock className="mr-1 h-4 w-4" />
               <span>
@@ -74,7 +73,6 @@ export default async function MovieDetailPage({ params }: { params: { id: string
           </div>
         </div>
       </div>
-
       <div className="container px-4 py-8 space-y-12">
         {/* Similar Movies */}
         {similarMovies && similarMovies.length > 0 && (

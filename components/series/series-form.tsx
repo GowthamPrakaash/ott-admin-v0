@@ -5,16 +5,16 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import { FileUploader } from "@/components/shared/file-uploader"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const formSchema = z.object({
   title: z.string().min(2, { message: "Title must be at least 2 characters" }),
@@ -25,7 +25,7 @@ const formSchema = z.object({
     .number()
     .min(1900, { message: "Release year must be at least 1900" })
     .max(new Date().getFullYear() + 5),
-  genre: z.string().min(2, { message: "Genre must be at least 2 characters" }),
+  genres: z.array(z.string().min(1)).min(1, { message: "Select at least one genre" }),
   poster_url: z.string().min(1, { message: "Poster image is required" }),
   status: z.enum(["draft", "published"]),
 })
@@ -33,28 +33,23 @@ const formSchema = z.object({
 export function SeriesForm({ series }: { series?: any }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
-  const { toast } = useToast()
-  const supabase = createClient()
   const [genres, setGenres] = useState<any[]>([])
 
   useEffect(() => {
+    console.log("series:", series)
     async function fetchGenres() {
-      const { data, error } = await supabase.from("genres").select("id, name").order("name")
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load genres. Please try again.",
-        })
-        return
+      try {
+        const res = await fetch("/api/genres")
+        if (!res.ok) throw new Error("Failed to load genres.")
+        const genres = await res.json()
+        setGenres(genres)
+      } catch (error) {
+        toast.error("Failed to load genres. Please try again.")
       }
-
-      setGenres(data || [])
     }
 
     fetchGenres()
-  }, [toast, supabase])
+  }, [])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -64,7 +59,7 @@ export function SeriesForm({ series }: { series?: any }) {
       meta_title: series?.meta_title || "",
       meta_description: series?.meta_description || "",
       release_year: series?.release_year || new Date().getFullYear(),
-      genre: series?.genre || "",
+      genres: series?.genres?.map((g: any) => g.id) || [],
       poster_url: series?.poster_url || "",
       status: series?.status || "draft",
     },
@@ -74,41 +69,29 @@ export function SeriesForm({ series }: { series?: any }) {
     setIsSubmitting(true)
 
     try {
+      const formValues = { ...values }
       if (series) {
-        // Update existing series
-        const { error } = await supabase.from("series").update(values).eq("id", series.id)
-
-        if (error) throw error
-
-        toast({
-          title: "Series updated",
-          description: "Your series has been updated successfully.",
+        const res = await fetch("/api/series", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: series.id, ...formValues }),
         })
-
-        // Redirect to series detail page
+        if (!res.ok) throw new Error("Failed to update series.")
+        toast.success("Series updated. Your series has been updated successfully.")
         router.push(`/dashboard/series/${series.id}`)
       } else {
-        // Create new series
-        const { error, data } = await supabase.from("series").insert(values).select()
-
-        if (error) throw error
-
-        toast({
-          title: "Series added",
-          description: "Your series has been added successfully.",
+        const res = await fetch("/api/series", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formValues),
         })
-
-        // Redirect to series list
+        if (!res.ok) throw new Error("Failed to add series.")
+        toast.success("Series added. Your series has been added successfully.")
         router.push("/dashboard/series")
       }
-
       router.refresh()
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Something went wrong. Please try again.",
-      })
+      toast.error(error.message || "Something went wrong. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
@@ -146,34 +129,34 @@ export function SeriesForm({ series }: { series?: any }) {
                 </FormItem>
               )}
             />
-
-            <FormField
-              control={form.control}
-              name="genre"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Genre</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a genre" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {genres.map((genre) => (
-                        <SelectItem key={genre.id} value={genre.name}>
-                          {genre.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>Select the primary genre of the series</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </div>
         </div>
+
+        <FormField
+          control={form.control}
+          name="genres"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Genres</FormLabel>
+              <div className="flex flex-wrap gap-2">
+                {genres.map((genre) => (
+                  <label key={genre.id} className="flex items-center gap-2">
+                    <Checkbox
+                      checked={field.value.includes(genre.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) field.onChange([...field.value, genre.id])
+                        else field.onChange(field.value.filter((id: string) => id !== genre.id))
+                      }}
+                    />
+                    <span>{genre.name}</span>
+                  </label>
+                ))}
+              </div>
+              <FormDescription>Select one or more genres for the series</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}
