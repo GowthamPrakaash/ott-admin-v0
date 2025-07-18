@@ -8,7 +8,6 @@ export function RecentWatchHistory() {
         fetch("/api/history")
             .then((res) => res.json())
             .then((data) => {
-                console.log("Recent watch history:", data)
                 setHistory(data.recent || [])
             })
     }, [])

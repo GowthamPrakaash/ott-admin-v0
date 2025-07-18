@@ -33,41 +33,112 @@ export function VideoPlayer({ content, contentType, nextEpisode }: VideoPlayerPr
 
   // Initialize video.js player
   useEffect(() => {
-    if (!videoNode.current) return;
-    // Dispose previous player if exists
-    if (player.current) {
-      player.current.dispose();
-      player.current = null;
-    }
-    if (content && content.video_id) {
-      player.current = videojs(videoNode.current, {
-        controls: true,
-        autoplay: true,
-        preload: 'auto',
-        sources: [
-          {
-            src: `http://localhost:3000/${content.video_id}`,
-            type: 'video/mp4',
-          },
-        ],
-      });
+    // Wait for next tick to ensure DOM is ready
+    const initializePlayer = () => {
+      if (!videoNode.current) return;
 
-      // Add subtitles if available
-      if (content.subtitles && Array.isArray(content.subtitles)) {
-        content.subtitles.forEach((sub: any) => {
-          player.current.addRemoteTextTrack({
-            kind: 'subtitles',
-            src: sub.url,
-            srclang: sub.language || 'en',
-            label: sub.label || sub.language || 'English',
-            default: sub.default || false,
-          }, false);
-        });
+      // Check if element is actually in the DOM
+      if (!document.contains(videoNode.current)) return;
+
+      // Dispose previous player if exists
+      if (player.current) {
+        player.current.dispose();
+        player.current = null;
       }
-    }
+
+      if (content && content.video_id) {
+        try {
+          player.current = videojs(videoNode.current, {
+            controls: true,
+            preload: 'auto',
+            responsive: true,
+            fluid: true,
+            // Enable subtitle support
+            html5: {
+              srt: {
+                allowNativeTextTracks: false
+              }
+            },
+            // Enable text track display
+            textTrackDisplay: {
+              allowMultipleShowingTracks: false
+            },
+            // Force enable text track settings
+            textTrackSettings: true,
+            sources: [
+              {
+                src: `${process.env.NEXT_PUBLIC_BASE_URL}/${content.video_id}`,
+                type: 'video/mp4',
+              },
+            ],
+          });
+
+          // Wait for player to be ready before adding subtitles
+          player.current.ready(() => {
+            console.log("Player ready, content.subtitles:", content.subtitles);
+
+            // Add subtitles if available
+            if (content.subtitles && Array.isArray(content.subtitles) && content.subtitles.length > 0) {
+              content.subtitles.forEach((sub: any, index: number) => {
+
+                const trackOptions = {
+                  kind: 'subtitles',
+                  src: sub.src || sub.url, // Handle both src and url properties
+                  srclang: sub.language || 'en',
+                  label: sub.label || sub.language || 'English',
+                  default: index === 0, // Make first subtitle track default
+                  mode: index === 0 ? 'showing' : 'disabled', // Enable first track by default
+                };
+
+                try {
+                  const track = player.current.addRemoteTextTrack(trackOptions, false);
+                  console.log(`Subtitle track added:`, trackOptions);
+
+                  // Ensure the track is enabled and showing
+                  if (index === 0) {
+                    track.track.mode = 'showing';
+                    console.log(`First track enabled: ${track.track.label}`);
+                  }
+                } catch (err) {
+                  console.error(`Error adding subtitle track:`, err, trackOptions);
+                }
+              });
+
+              // Force enable subtitles menu
+              const subtitlesButton = player.current.getChild('controlBar').getChild('subtitlesButton');
+              if (subtitlesButton) {
+                subtitlesButton.show();
+              }
+
+              // Ensure text track display is visible and properly configured
+              const textTrackDisplay = player.current.getChild('textTrackDisplay');
+              if (textTrackDisplay) {
+                textTrackDisplay.show();
+                console.log('Text track display enabled');
+              }
+
+              // Force update text tracks after a short delay
+              setTimeout(() => {
+                player.current.trigger('texttrackchange');
+                console.log('Text track change triggered');
+              }, 500);
+
+            } else {
+              console.log("No subtitles available for this content");
+            }
+          });
+        } catch (error) {
+          console.error('Error initializing video player:', error);
+        }
+      }
+    };
+
+    // Use setTimeout to ensure DOM is fully ready
+    const timeoutId = setTimeout(initializePlayer, 0);
 
     // Clean up player on unmount
     return () => {
+      clearTimeout(timeoutId);
       if (player.current) {
         player.current.dispose();
         player.current = null;
@@ -84,11 +155,15 @@ export function VideoPlayer({ content, contentType, nextEpisode }: VideoPlayerPr
     else if (contentType === "series") payload.seriesId = content.id;
     else if (contentType === "episode") payload.episodeId = content.id;
     if (!payload.movieId && !payload.seriesId && !payload.episodeId) return;
+
     fetch("/api/history", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    });
+    })
+      .catch((error) => {
+        console.error("Error recording watch history:", error);
+      });
   }, [content, contentType]);
 
   if (!session) {

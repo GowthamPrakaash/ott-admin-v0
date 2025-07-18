@@ -95,12 +95,11 @@ export function SubtitleUploader({ videoId, value = [], onChange, contentType }:
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
 
-      // Check if file is a valid subtitle format (srt, vtt, etc.)
-      const validExtensions = [".srt", ".vtt", ".sub", ".sbv", ".ttml", ".dfxp"]
+      // Check if file is a valid WebVTT format only
       const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase()
 
-      if (!validExtensions.includes(fileExtension)) {
-        toast.error("Please upload a valid subtitle file (SRT, VTT, SUB, SBV, TTML, DFXP)")
+      if (fileExtension !== ".vtt") {
+        toast.error("Please upload a valid WebVTT subtitle file (.vtt)")
         return
       }
 
@@ -270,11 +269,11 @@ export function SubtitleUploader({ videoId, value = [], onChange, contentType }:
               <Input
                 id="subtitle-file"
                 type="file"
-                accept=".srt,.vtt,.sub,.sbv,.ttml,.dfxp"
+                accept=".vtt"
                 onChange={handleFileChange}
                 ref={fileInputRef}
               />
-              <p className="text-xs text-muted-foreground">Supported formats: SRT, VTT, SUB, SBV, TTML, DFXP</p>
+              <p className="text-xs text-muted-foreground">Supported format: VTT</p>
             </div>
 
             <div className="flex justify-end gap-2">

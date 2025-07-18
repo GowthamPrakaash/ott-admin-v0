@@ -12,6 +12,12 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File
     if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 })
 
+    // Validate file extension is .vtt (WebVTT format only)
+    const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase()
+    if (fileExtension !== ".vtt") {
+        return NextResponse.json({ error: "Only WebVTT (.vtt) files are supported" }, { status: 400 })
+    }
+
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
     const fileName = `${Date.now()}-${file.name}`
@@ -20,5 +26,5 @@ export async function POST(request: NextRequest) {
     const filePath = path.join(uploadDir, fileName)
     await fs.writeFile(filePath, buffer)
 
-    return NextResponse.json({ url: `/data/subtitles/${fileName}` })
+    return NextResponse.json({ url: `/api/data/subtitles/${fileName}` })
 }

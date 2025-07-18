@@ -20,5 +20,5 @@ export async function POST(request: NextRequest) {
     const filePath = path.join(uploadDir, fileName)
     await fs.writeFile(filePath, buffer)
 
-    return NextResponse.json({ url: `/data/posters/${fileName}` })
+    return NextResponse.json({ url: `/api/data/posters/${fileName}` })
 }

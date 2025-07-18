@@ -36,11 +36,14 @@ function recordWatchHistory(type: string, id: string) {
   if (type === "movie") body.movieId = id
   else if (type === "episode") body.episodeId = id
   else if (type === "series") body.seriesId = id
-  fetch("/api/history", {
+  fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/history`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   })
+    .catch((error) => {
+      console.error("Error recording watch history:", error);
+    })
 }
 
 export default async function WatchPage({ params }: { params: Promise<{ type: string; id: string }> }) {
@@ -118,7 +121,7 @@ export default async function WatchPage({ params }: { params: Promise<{ type: st
   recordWatchHistory(awaitedParams.type, awaitedParams.id)
 
   return (
-    <div className="container px-4 py-8 space-y-8">
+    <div className="px-4 py-8 space-y-8">
       <VideoPlayer content={content} contentType={awaitedParams.type} nextEpisode={nextEpisode} />
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">{content.title}</h1>

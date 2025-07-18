@@ -357,7 +357,7 @@ export function EpisodeForm({ episode }: { episode?: any }) {
                   contentType="episode"
                 />
               </FormControl>
-              <FormDescription>Upload subtitle files in different languages (SRT, VTT, etc.)</FormDescription>
+              <FormDescription>Upload subtitle files in WebVTT format (.vtt)</FormDescription>
               <FormMessage />
             </FormItem>
           )}

@@ -41,7 +41,7 @@ export default async function ProfilePage() {
               <div className="relative w-24 h-24 rounded-full overflow-hidden bg-gray-800">
                 <UserIcon className="absolute inset-0 m-auto h-12 w-12 text-gray-600" />
               </div>
-              <h2 className="mt-4 text-xl font-bold">{user.name || user.email || "User"}</h2>
+              <h2 className="mt-4 text-xl font-bold">{user.username || user.email || "User"}</h2>
               <p className="text-gray-400">{user.email}</p>
             </div>
             <div className="space-y-2">
@@ -77,7 +77,7 @@ export default async function ProfilePage() {
                 </div>
                 {user.subscriptionStatus !== 'active' && (
                   <Button asChild>
-                    <Link href="/subscription">Subscribe</Link>
+                    <Link href="/stream/subscription">Subscribe</Link>
                   </Button>
                 )}
               </div>

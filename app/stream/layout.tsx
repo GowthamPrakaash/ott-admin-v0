@@ -4,13 +4,14 @@ export const dynamic = "force-dynamic"
 
 import type React from "react"
 import Link from "next/link"
-import { Film, Home, Search, Tv, User } from "lucide-react"
+import { Film, Home, Search, Tv, User, Settings } from "lucide-react"
 import { ThemeProvider } from "@/components/theme-provider"
 import "./stream.css"
 import { Suspense } from "react"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
 import { useSession } from "next-auth/react"
+import { Button } from "@/components/ui/button"
 
 // export const metadata = {
 //   title: "Apsara Streaming",
@@ -23,6 +24,8 @@ export default function StreamLayout({
   children: React.ReactNode
 }>) {
   const { data: session } = useSession()
+  const userRole = session?.user?.role || "viewer"
+  const isAdminOrEditor = userRole === "admin" || userRole === "editor"
 
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
@@ -59,9 +62,16 @@ export default function StreamLayout({
                       <Link href="/stream/search" className="text-lg font-medium py-2">
                         Search
                       </Link>
-                      <Link href="/stream/login" className="text-lg font-medium py-2">
-                        Login
-                      </Link>
+                      {!session && (
+                        <Link href="/stream/login" className="text-lg font-medium py-2">
+                          Login
+                        </Link>
+                      )}
+                      {isAdminOrEditor && (
+                        <Link href="/dashboard" className="text-lg font-medium py-2 text-blue-400">
+                          Go to Admin Dashboard
+                        </Link>
+                      )}
                     </nav>
                   </SheetContent>
                 </Sheet>
@@ -84,6 +94,17 @@ export default function StreamLayout({
               <Link href="/stream/search" className="p-2 hover:bg-white/10 rounded-full transition">
                 <Search className="h-5 w-5" />
               </Link>
+
+              {/* Dashboard button for admin/editor users */}
+              {isAdminOrEditor && (
+                <Button asChild variant="outline" size="sm" className="hidden md:flex">
+                  <Link href="/dashboard">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Go to Dashboard
+                  </Link>
+                </Button>
+              )}
+
               {session ? (
                 <Link href="/stream/profile" className="p-2 hover:bg-white/10 rounded-full transition flex items-center justify-center w-9 h-9 bg-white/10 rounded-full">
                   <span className="font-bold text-lg uppercase">
@@ -101,23 +122,29 @@ export default function StreamLayout({
 
         {/* Mobile navigation */}
         <div className="fixed bottom-0 w-full z-50 bg-black/90 backdrop-blur-sm md:hidden">
-          <div className="flex items-center justify-around py-3">
-            <Link href="/stream" className="flex flex-col items-center">
+          <div className={`flex items-center justify-around py-3 ${isAdminOrEditor ? 'px-2' : 'px-4'}`}>
+            <Link href="/stream" className="flex flex-col items-center min-w-0">
               <Home className="h-5 w-5" />
               <span className="text-xs mt-1">Home</span>
             </Link>
-            <Link href="/stream/movies" className="flex flex-col items-center">
+            <Link href="/stream/movies" className="flex flex-col items-center min-w-0">
               <Film className="h-5 w-5" />
               <span className="text-xs mt-1">Movies</span>
             </Link>
-            <Link href="/stream/series" className="flex flex-col items-center">
+            <Link href="/stream/series" className="flex flex-col items-center min-w-0">
               <Tv className="h-5 w-5" />
               <span className="text-xs mt-1">Series</span>
             </Link>
-            <Link href="/stream/profile" className="flex flex-col items-center">
+            <Link href="/stream/profile" className="flex flex-col items-center min-w-0">
               <User className="h-5 w-5" />
               <span className="text-xs mt-1">Profile</span>
             </Link>
+            {isAdminOrEditor && (
+              <Link href="/dashboard" className="flex flex-col items-center min-w-0">
+                <Settings className="h-5 w-5" />
+                <span className="text-xs mt-1">Admin</span>
+              </Link>
+            )}
           </div>
         </div>
 
