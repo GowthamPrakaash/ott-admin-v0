@@ -1,6 +1,8 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export const metadata: Metadata = {
@@ -9,12 +11,10 @@ export const metadata: Metadata = {
 }
 
 export default async function ProfilePage() {
-  // TODO: Replace with your own session logic
-  // For now, fetch the first user as a placeholder
-  const user = await prisma.user.findFirst()
-  if (!user) {
-    redirect("/login")
-  }
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) redirect("/login")
+  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  if (!user) redirect("/login")
   return (
     <div className="space-y-6">
       <div>
@@ -38,6 +38,15 @@ export default async function ProfilePage() {
           <div>
             <h3 className="text-sm font-medium">Created At</h3>
             <p className="text-sm text-muted-foreground">{user.createdAt.toLocaleString()}</p>
+          </div>
+          <div>
+            <h3 className="text-sm font-medium">Subscription Status</h3>
+            <p className="text-sm text-muted-foreground">
+              {user.subscriptionStatus === 'active' ? 'Active' : 'Inactive'}
+              {user.subscriptionExpiry && user.subscriptionStatus === 'active' && (
+                <span> (expires {user.subscriptionExpiry.toLocaleDateString()})</span>
+              )}
+            </p>
           </div>
         </CardContent>
       </Card>

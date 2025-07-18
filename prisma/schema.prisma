@@ -24,6 +24,9 @@ model User {
   sessions      Session[]
   emailVerified DateTime?
   WatchHistory  WatchHistory[]
+  subscriptionStatus String   @default("inactive") // 'active' or 'inactive'
+  subscriptionExpiry DateTime?
+  payments          Payment[]
 }
 
 model Genre {
@@ -141,4 +144,16 @@ model WatchHistory {
   watchedAt DateTime @default(now())
 
   @@index([userId, watchedAt])
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  razorpayOrderId String
+  razorpayPaymentId String
+  amount        Int
+  currency      String
+  status        String
+  createdAt     DateTime @default(now())
 }

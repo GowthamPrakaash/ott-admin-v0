@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export const metadata: Metadata = {
-  title: "Dashboard",
-  description: "OTT Admin Dashboard",
+  title: "Apsara Entertainment OTT Dashboard",
+  description: "Apsara Entertainment OTT Dashboard",
 }
 
 export default async function DashboardPage() {

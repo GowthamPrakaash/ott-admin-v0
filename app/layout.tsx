@@ -7,9 +7,8 @@ import { Toaster } from "@/components/ui/sonner"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "OTT Admin Dashboard",
-  description: "Admin dashboard for managing movies and series",
-  generator: 'v0.dev'
+  title: "Apsara Entertainment OTT",
+  description: "Apsara Entertainment OTT",
 }
 
 export const dynamic = "force-dynamic"
