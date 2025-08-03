@@ -57,3 +57,56 @@ export async function isAdmin(req: NextRequest) {
     const managed = await prisma.managedRole.findUnique({ where: { email: session.user.email } })
     return managed?.role === "admin"
 }
+
+export async function isEditor(req: NextRequest) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) return false
+    const managed = await prisma.managedRole.findUnique({ where: { email: session.user.email } })
+    return managed?.role === "editor"
+}
+
+export async function isAdminOrEditor(req: NextRequest) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) return false
+    const managed = await prisma.managedRole.findUnique({ where: { email: session.user.email } })
+    return managed?.role === "admin" || managed?.role === "editor"
+}
+
+export async function canWatchVideos(email: string): Promise<boolean> {
+    // Check if user has admin or editor role
+    const managed = await prisma.managedRole.findUnique({ where: { email } })
+    if (managed?.role === "admin" || managed?.role === "editor") {
+        return true
+    }
+
+    // Check if user has active subscription
+    const user = await prisma.user.findUnique({
+        where: { email },
+        select: { subscriptionStatus: true, subscriptionExpiry: true }
+    })
+
+    if (!user) return false
+
+    return user.subscriptionStatus === "active" &&
+        user.subscriptionExpiry &&
+        user.subscriptionExpiry > new Date()
+}
+
+export async function getUserSubscriptionStatus(email: string) {
+    const user = await prisma.user.findUnique({
+        where: { email },
+        select: {
+            subscriptionStatus: true,
+            subscriptionExpiry: true,
+            id: true
+        }
+    })
+
+    const managed = await prisma.managedRole.findUnique({ where: { email } })
+
+    return {
+        user,
+        role: managed?.role || "viewer",
+        canWatch: await canWatchVideos(email)
+    }
+}

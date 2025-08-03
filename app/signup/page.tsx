@@ -29,12 +29,12 @@ export default async function SignUpPage() {
           >
             <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
           </svg>
-          Apsara Streaming
+          Apsara Entertainment
         </div>
         <div className="relative z-20 mt-auto">
           <blockquote className="space-y-2">
             <p className="text-lg">
-              Create an account to start streaming movies, series, and episodes. Enjoy your favorite content anytime on Apsara Streaming.
+              Create an account to start streaming movies, series, and episodes. Enjoy your favorite content anytime on Apsara Entertainment.
             </p>
             <footer className="text-sm">Apsara OTT</footer>
           </blockquote>
@@ -43,7 +43,7 @@ export default async function SignUpPage() {
       <div className="lg:p-8">
         <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
           <div className="flex flex-col space-y-2 text-center">
-            <h1 className="text-2xl font-semibold tracking-tight">Create an account for Apsara Streaming</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Create an account for Apsara Entertainment</h1>
             <p className="text-sm text-muted-foreground">Enter your details to start streaming instantly.</p>
           </div>
           <SignUpForm />

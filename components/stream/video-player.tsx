@@ -12,9 +12,10 @@ interface VideoPlayerProps {
   content: any
   contentType: string
   nextEpisode?: any
+  userCanWatch?: boolean
 }
 
-export function VideoPlayer({ content, contentType, nextEpisode }: VideoPlayerProps) {
+export function VideoPlayer({ content, contentType, nextEpisode, userCanWatch = true }: VideoPlayerProps) {
   const { data: session, status } = useSession();
   const [showNextEpisode, setShowNextEpisode] = useState(false)
   const videoNode = useRef<HTMLVideoElement | null>(null)
@@ -46,7 +47,7 @@ export function VideoPlayer({ content, contentType, nextEpisode }: VideoPlayerPr
         player.current = null;
       }
 
-      if (content && content.video_id) {
+      if (content && content.video_id && userCanWatch) {
         try {
           player.current = videojs(videoNode.current, {
             controls: true,
@@ -75,8 +76,6 @@ export function VideoPlayer({ content, contentType, nextEpisode }: VideoPlayerPr
 
           // Wait for player to be ready before adding subtitles
           player.current.ready(() => {
-            console.log("Player ready, content.subtitles:", content.subtitles);
-
             // Add subtitles if available
             if (content.subtitles && Array.isArray(content.subtitles) && content.subtitles.length > 0) {
               content.subtitles.forEach((sub: any, index: number) => {
@@ -92,12 +91,10 @@ export function VideoPlayer({ content, contentType, nextEpisode }: VideoPlayerPr
 
                 try {
                   const track = player.current.addRemoteTextTrack(trackOptions, false);
-                  console.log(`Subtitle track added:`, trackOptions);
 
                   // Ensure the track is enabled and showing
                   if (index === 0) {
                     track.track.mode = 'showing';
-                    console.log(`First track enabled: ${track.track.label}`);
                   }
                 } catch (err) {
                   console.error(`Error adding subtitle track:`, err, trackOptions);
@@ -114,17 +111,13 @@ export function VideoPlayer({ content, contentType, nextEpisode }: VideoPlayerPr
               const textTrackDisplay = player.current.getChild('textTrackDisplay');
               if (textTrackDisplay) {
                 textTrackDisplay.show();
-                console.log('Text track display enabled');
               }
 
               // Force update text tracks after a short delay
               setTimeout(() => {
                 player.current.trigger('texttrackchange');
-                console.log('Text track change triggered');
               }, 500);
 
-            } else {
-              console.log("No subtitles available for this content");
             }
           });
         } catch (error) {
@@ -144,10 +137,11 @@ export function VideoPlayer({ content, contentType, nextEpisode }: VideoPlayerPr
         player.current = null;
       }
     };
-  }, [content, session?.user?.email])
+  }, [content, session?.user?.email, userCanWatch])
 
   // Record watch event in history
   useEffect(() => {
+    if (!session?.user?.email || !userCanWatch) return;
     if (!content || !content.video_id) return;
     // Determine the type and id to send
     let payload: any = {};
@@ -164,12 +158,25 @@ export function VideoPlayer({ content, contentType, nextEpisode }: VideoPlayerPr
       .catch((error) => {
         console.error("Error recording watch history:", error);
       });
-  }, [content, contentType]);
+  }, [content, contentType, session?.user?.email, userCanWatch]);
 
   if (!session) {
     return (
       <div className="aspect-video bg-gray-900 flex items-center justify-center rounded-lg">
         <p className="text-gray-400 text-center">Please <a href="/login" className="underline">log in</a> to watch this video.</p>
+      </div>
+    );
+  }
+
+  if (!userCanWatch) {
+    return (
+      <div className="aspect-video bg-gray-900 flex items-center justify-center rounded-lg">
+        <div className="text-center space-y-4">
+          <p className="text-gray-400">Subscription required to watch this content</p>
+          <Button asChild>
+            <Link href="/stream/subscription">Subscribe Now</Link>
+          </Button>
+        </div>
       </div>
     );
   }

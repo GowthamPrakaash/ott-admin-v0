@@ -7,8 +7,8 @@ export async function generateMetadata({ params }: { params: Promise<{ name: str
   const decodedName = decodeURIComponent(awaitedParams.name)
 
   return {
-    title: `${decodedName} | Apsara Streaming`,
-    description: `Browse ${decodedName} content on Apsara Streaming`,
+    title: `${decodedName} | Apsara Entertainment`,
+    description: `Browse ${decodedName} content on Apsara Entertainment`,
   }
 }
 

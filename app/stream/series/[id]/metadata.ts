@@ -13,6 +13,6 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
   }
 
   return {
-    title: `${series.meta_title || series.title} | Apsara Streaming`,
+    title: `${series.meta_title || series.title} | Apsara Entertainment`,
   }
 }

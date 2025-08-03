@@ -36,7 +36,6 @@ export function SeriesForm({ series }: { series?: any }) {
   const [genres, setGenres] = useState<any[]>([])
 
   useEffect(() => {
-    console.log("series:", series)
     async function fetchGenres() {
       try {
         const res = await fetch("/api/genres")

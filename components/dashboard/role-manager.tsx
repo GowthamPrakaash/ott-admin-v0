@@ -47,8 +47,8 @@ export function RoleManager() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, role }),
             })
-            if (!res.ok) throw new Error("Failed to add/update role")
-            toast.success("Role updated")
+            if (!res.ok) throw new Error("Failed to add role. Remove it first if you want to update.")
+            toast.success("Role added successfully")
             setEmail("")
             setRole("editor")
             fetchRoles()

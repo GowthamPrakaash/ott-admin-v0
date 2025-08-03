@@ -20,10 +20,14 @@ export async function POST(req: NextRequest) {
     if (!email || !["admin", "editor"].includes(role)) {
         return NextResponse.json({ error: "Invalid input" }, { status: 400 })
     }
-    const managed = await prisma.managedRole.upsert({
-        where: { email },
-        update: { role },
-        create: { email, role },
+    const existing = await prisma.managedRole.findUnique({ where: { email } })
+    if (existing) {
+        return NextResponse.json({
+            error: "Role already exists for this email. Remove it first if you want to update.",
+        }, { status: 400 })
+    }
+    const managed = await prisma.managedRole.create({
+        data: { email, role },
     })
     return NextResponse.json(managed)
 }

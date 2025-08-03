@@ -1,7 +1,11 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
+import { getServerSession } from "next-auth"
 import { prisma } from "@/lib/prisma"
 import { VideoPlayer } from "@/components/stream/video-player"
 import { ContentSlider } from "@/components/stream/content-slider"
+import { authOptions, canWatchVideos } from "@/lib/auth"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 export async function generateMetadata({ params }: { params: Promise<{ type: string; id: string }> }) {
   const awaitedParams = await params;
@@ -13,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ type: str
     if (!movie) {
       return { title: "Content Not Found" }
     }
-    return { title: `${movie.meta_title || movie.title} | Apsara Streaming` }
+    return { title: `${movie.meta_title || movie.title} | Apsara Entertainment` }
   } else if (awaitedParams.type === "episode") {
     const episode = await prisma.episode.findUnique({
       where: { id: awaitedParams.id },
@@ -26,9 +30,9 @@ export async function generateMetadata({ params }: { params: Promise<{ type: str
       where: { id: episode.series_id },
       select: { title: true },
     })
-    return { title: `${episode.meta_title || episode.title} - ${series?.title || "Series"} | Apsara Streaming` }
+    return { title: `${episode.meta_title || episode.title} - ${series?.title || "Series"} | Apsara Entertainment` }
   }
-  return { title: "Watch | Apsara Streaming" }
+  return { title: "Watch | Apsara Entertainment" }
 }
 
 function recordWatchHistory(type: string, id: string) {
@@ -48,6 +52,40 @@ function recordWatchHistory(type: string, id: string) {
 
 export default async function WatchPage({ params }: { params: Promise<{ type: string; id: string }> }) {
   const awaitedParams = await params;
+
+  // Check authentication
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    redirect("/login?redirectTo=" + encodeURIComponent(`/stream/watch/${awaitedParams.type}/${awaitedParams.id}`))
+  }
+
+  // Check subscription access
+  const canWatch = await canWatchVideos(session.user.email)
+  if (!canWatch) {
+    return (
+      <div className="px-4 py-8 max-w-2xl mx-auto text-center space-y-6">
+        <div className="space-y-4">
+          <h1 className="text-3xl font-bold">Subscription Required</h1>
+          <p className="text-gray-400 text-lg">
+            This content is only available to subscribers. Subscribe now to enjoy unlimited access to our entire library.
+          </p>
+        </div>
+        <div className="space-y-4">
+          <Button asChild size="lg">
+            <Link href="/stream/subscription">
+              Subscribe Now
+            </Link>
+          </Button>
+          <div>
+            <Link href="/stream" className="text-blue-400 hover:underline">
+              ← Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   let content: any = null
   let relatedContent: any[] = []
   let nextEpisode: any = null

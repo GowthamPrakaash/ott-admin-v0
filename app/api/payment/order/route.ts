@@ -38,12 +38,14 @@ export async function POST(req: NextRequest) {
         const order = await razorpay.orders.create({
             amount: amount * 100, // amount in paise
             currency: 'INR',
-            receipt: `order_${email}_${Date.now()}`,
+            receipt: `order_${Date.now()}`,
+            // receipt: `order_${email}_${Date.now()}`,
             payment_capture: true,
             notes: { email },
         });
         return NextResponse.json(order);
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('Error creating Razorpay order:', error);
+        return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
     }
 }

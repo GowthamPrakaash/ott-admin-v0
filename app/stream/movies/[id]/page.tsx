@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!movie) {
     return { title: "Movie Not Found" }
   }
-  return { title: `${movie.meta_title || movie.title} | Apsara Streaming` }
+  return { title: `${movie.meta_title || movie.title} | Apsara Entertainment` }
 }
 
 export default async function MovieDetailPage({ params }: { params: Promise<{ id: string }> }) {

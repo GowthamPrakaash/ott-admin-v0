@@ -14,7 +14,7 @@ import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 
 // export const metadata = {
-//   title: "Apsara Streaming",
+//   title: "Apsara Entertainment",
 //   description: "Watch movies and series on Apsara",
 // }
 

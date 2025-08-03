@@ -2,8 +2,8 @@ import { prisma } from "@/lib/prisma"
 import { ContentGrid } from "@/components/stream/content-grid"
 
 export const metadata = {
-  title: "Movies | Apsara Streaming",
-  description: "Browse all movies on Apsara Streaming",
+  title: "Movies | Apsara Entertainment",
+  description: "Browse all movies on Apsara Entertainment",
 }
 
 export default async function MoviesPage() {
