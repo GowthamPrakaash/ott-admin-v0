@@ -28,4 +28,4 @@ next-env.d.ts
 /lib/generated/prisma
 
 # files storage
-data/
+/data/
